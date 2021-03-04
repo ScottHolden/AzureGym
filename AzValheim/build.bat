@@ -1,0 +1,1 @@
+az bicep build -f ./template.bicep --stdout > ./generated/template.json

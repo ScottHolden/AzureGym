@@ -5,36 +5,57 @@
     "_generator": {
       "name": "bicep",
       "version": "0.4.1008.15138",
-      "templateHash": "7139816087855270386"
+      "templateHash": "13768867731946984125"
     }
   },
   "parameters": {
     "location": {
       "type": "string",
-      "defaultValue": "AustraliaEast"
+      "defaultValue": "AustraliaEast",
+      "metadata": {
+        "description": "The location for all resources to be deployed"
+      }
     },
     "prefix": {
       "type": "string",
-      "defaultValue": "Demo"
+      "defaultValue": "Demo",
+      "metadata": {
+        "description": "The prefix to be used for all resource names"
+      }
     },
     "username": {
       "type": "string",
-      "defaultValue": "vwandemo"
+      "defaultValue": "vwandemo",
+      "metadata": {
+        "description": "The username for all deployed VMs"
+      }
     },
     "sshPublicKey": {
-      "type": "string"
+      "type": "string",
+      "metadata": {
+        "description": "The ssh public key to be deployed to all VMs"
+      }
     },
     "vmSize": {
       "type": "string",
-      "defaultValue": "Standard_D2s_v4"
+      "defaultValue": "Standard_D2s_v4",
+      "metadata": {
+        "description": "The vm size for all deployed VMs (Total 4 VMs, must have quota)"
+      }
     },
     "allowedIp": {
       "type": "string",
-      "defaultValue": ""
+      "defaultValue": "",
+      "metadata": {
+        "description": "The ip address that should be allowed for SSH access, if left empty, no ssh rule will be added. Should be in a 100.100.100.100/32 format."
+      }
     },
     "sharedKey": {
       "type": "string",
-      "defaultValue": "bJR3pKyHI/ojhgnzXHqwA0KTxjhaCJP1HVIEfmwqlHKKOKuD5DvSufNIZ8U0Rp4rBZlhMjDP8SplNyGKvCH2Pw=="
+      "defaultValue": "bJR3pKyHI/ojhgnzXHqwA0KTxjhaCJP1HVIEfmwqlHKKOKuD5DvSufNIZ8U0Rp4rBZlhMjDP8SplNyGKvCH2Pw==",
+      "metadata": {
+        "description": "The shared key to use for the ipsec VPN, should be random, long, and should remain the same if redeployed"
+      }
     },
     "zoneAddressSpaces": {
       "type": "object",
@@ -46,11 +67,24 @@
         "Green": [
           "10.20.1.0/24"
         ]
+      },
+      "metadata": {
+        "description": "An array of zones & address spaaces to deploy, don't change this for the default demo topology"
+      }
+    },
+    "onpremAddressSpace": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/24",
+      "metadata": {
+        "description": "The on-premises address space to deploy, this will be a vnet, don't change this for the default demo topology"
       }
     },
     "vwanAddressSpace": {
       "type": "string",
-      "defaultValue": "10.250.0.0/24"
+      "defaultValue": "10.250.0.0/24",
+      "metadata": {
+        "description": "The address space to use for vwan routing/gateways, don't change this for the default demo topology"
+      }
     }
   },
   "functions": [],
@@ -790,6 +824,9 @@
           "sshPublicKey": {
             "value": "[parameters('sshPublicKey')]"
           },
+          "addressSpace": {
+            "value": "[parameters('onpremAddressSpace')]"
+          },
           "vmSize": {
             "value": "[parameters('vmSize')]"
           },
@@ -810,7 +847,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.4.1008.15138",
-              "templateHash": "13174879560929379788"
+              "templateHash": "1469586864856924979"
             }
           },
           "parameters": {
@@ -830,6 +867,9 @@
               "type": "string"
             },
             "allowedIp": {
+              "type": "string"
+            },
+            "addressSpace": {
               "type": "string"
             },
             "sharedKey": {
@@ -876,7 +916,7 @@
                     "value": "[parameters('location')]"
                   },
                   "addressSpace": {
-                    "value": "10.0.0.0/24"
+                    "value": "[parameters('addressSpace')]"
                   },
                   "zoneTag": {
                     "value": "[variables('zoneTag')]"

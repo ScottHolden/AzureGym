@@ -4,6 +4,7 @@ param username string
 param sshPublicKey string
 param vmSize string
 param allowedIp string
+param addressSpace string
 param sharedKey string
 param vwanPip string
 param localASN int = 61337
@@ -18,7 +19,7 @@ module vnet 'vnet.bicep' = {
   params: {
     name: '${prefix}-OnPrem'
     location: location
-    addressSpace: '10.0.0.0/24'
+    addressSpace: addressSpace
     zoneTag: zoneTag
     securityRules: empty(allowedIp) ? [] : [
       {

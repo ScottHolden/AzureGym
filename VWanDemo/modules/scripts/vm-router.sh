@@ -107,7 +107,10 @@ EOF
 
 chmod +x /etc/ipsec-vti.sh
 
-systemctl restart bird
+systemctl restart bird 2>1
 
-ipsec restart
-ipsec up vwan0
+ipsec restart 2>1
+ipsec up vwan0 2>1
+
+echo "done!"
+exit 0

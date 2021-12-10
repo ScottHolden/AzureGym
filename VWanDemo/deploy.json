@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.4.1008.15138",
-      "templateHash": "13768867731946984125"
+      "templateHash": "18006234188533118235"
     }
   },
   "parameters": {
@@ -609,7 +609,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.4.1008.15138",
-              "templateHash": "14270779587959229348"
+              "templateHash": "15350049491874868319"
             }
           },
           "parameters": {
@@ -709,7 +709,9 @@
             {
               "copy": {
                 "name": "vnetConnections",
-                "count": "[length(parameters('vnets'))]"
+                "count": "[length(parameters('vnets'))]",
+                "mode": "serial",
+                "batchSize": 1
               },
               "type": "Microsoft.Network/virtualHubs/hubVirtualNetworkConnections",
               "apiVersion": "2021-03-01",
@@ -847,7 +849,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.4.1008.15138",
-              "templateHash": "1469586864856924979"
+              "templateHash": "18336750574237607176"
             }
           },
           "parameters": {
@@ -1285,7 +1287,7 @@
                     "_generator": {
                       "name": "bicep",
                       "version": "0.4.1008.15138",
-                      "templateHash": "8561262610245663013"
+                      "templateHash": "14565710678883174355"
                     }
                   },
                   "parameters": {
@@ -1319,7 +1321,7 @@
                   },
                   "functions": [],
                   "variables": {
-                    "_script00": "#!/bin/bash\nsed -ir 's/#* *net.ipv4.ip_forward *= *[01]/net.ipv4.ip_forward = 1/g' /etc/sysctl.conf\nsysctl -p\n\nDEBIAN_FRONTEND=noninteractive apt-get update -yqqq\nDEBIAN_FRONTEND=noninteractive apt-get install strongswan bird -yqqq\n\ncat > /etc/bird/bird.conf <<EOF\nrouter id {{LocalBGPPeer}};\nprotocol device {\n    scan time 10;\n}\nprotocol static static_bgp {\n    route 0.0.0.0/0 via {{PrivateIP}};\n}\nprotocol kernel {\n    export filter {\n        if proto = \"static_bgp\" then reject;\n        krt_prefsrc = {{PrivateIP}};\n        accept;\n    };\n    import none;\n}\nprotocol bgp vwan\n{\n    keepalive time 20;\n    hold time 60;\n    graceful restart aware;\n    import all;\n    export where proto = \"static_bgp\";\n    local {{LocalBGPPeer}} as {{LocalASN}};\n    neighbor {{RemoteBGPPeer}} as {{RemoteASN}};\n}\nEOF\n\ncat > /etc/ipsec.conf <<EOF\nconfig setup\n    uniqueids=yes\n    strictcrlpolicy=no\nconn %default\n    authby=secret\n    ike=aes256-sha2_256-modp1024!\n    esp=aes256-sha2_256!\n    keyingtries=0\n    dpdaction=restart\nconn vwan0\n    left={{PrivateIP}}\n    leftsubnet=0.0.0.0/0\n    right={{VWanPIP}}\n    rightsubnet=0.0.0.0/0\n    auto=start\n    mark=%unique\n    leftupdown=\"/etc/ipsec-vti.sh 0 {{RemoteBGPPeer}}/30 {{LocalBGPPeer}}/30\"\nEOF\n\ncat > /etc/ipsec.secrets <<EOF\n{{PrivateIP}} {{VWanPIP}} : PSK \"{{SharedKey}}\"\nEOF\n\ncat > /etc/strongswan.d/charon.conf <<EOF\ncharon {\n    install_routes = no\n}\nEOF\n\ncat > /etc/ipsec-vti.sh <<EOF\n#!/bin/bash\nset -o nounset\nset -o errexit\n\nIP=\\$(which ip)\nIPTABLES=\\$(which iptables)\n\nPLUTO_MARK_OUT_ARR=(\\${PLUTO_MARK_OUT//// })\nPLUTO_MARK_IN_ARR=(\\${PLUTO_MARK_IN//// })\n\nVTI_TUNNEL_ID=\\${1}\nVTI_REMOTE=\\${2}\nVTI_LOCAL=\\${3}\n\nLOCAL_IF=\"\\${PLUTO_INTERFACE}\"\nVTI_IF=\"vti\\${VTI_TUNNEL_ID}\"\n\n# ipsec overhead is 73 bytes\nVTI_MTU=$((1460-73))\n\ncase \"\\${PLUTO_VERB}\" in\n    up-client)\n        \\${IP} link add \\${VTI_IF} type vti local \\${PLUTO_ME} remote \\${PLUTO_PEER} okey \\${PLUTO_MARK_OUT_ARR[0]} ikey \\${PLUTO_MARK_IN_ARR[0]}\n        \\${IP} addr add \\${VTI_LOCAL} remote \\${VTI_REMOTE} dev \"\\${VTI_IF}\"\n        \\${IP} link set \\${VTI_IF} up mtu \\${VTI_MTU}\n        sysctl -w net.ipv4.conf.\\${VTI_IF}.disable_policy=1\n        sysctl -w net.ipv4.conf.\\${VTI_IF}.rp_filter=2 || sysctl -w net.ipv4.conf.\\${VTI_IF}.rp_filter=0\n        \\${IPTABLES} -t mangle -I FORWARD -o \\${VTI_IF} -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu\n        \\${IPTABLES} -t mangle -I INPUT -p esp -s \\${PLUTO_PEER} -d \\${PLUTO_ME} -j MARK --set-xmark \\${PLUTO_MARK_IN}\n        \\${IP} route flush table 220\n        ;;\n    down-client)\n        \\${IP} tunnel del \"\\${VTI_IF}\"\n        ;;\nesac\n\nsysctl -w net.ipv4.ip_forward=1\nsysctl -w net.ipv4.conf.\\${LOCAL_IF}.disable_xfrm=1\nsysctl -w net.ipv4.conf.\\${LOCAL_IF}.disable_policy=1\nEOF\n\nchmod +x /etc/ipsec-vti.sh\n\nsystemctl restart bird\n\nipsec restart\nipsec up vwan0",
+                    "_script00": "#!/bin/bash\nsed -ir 's/#* *net.ipv4.ip_forward *= *[01]/net.ipv4.ip_forward = 1/g' /etc/sysctl.conf\nsysctl -p\n\nDEBIAN_FRONTEND=noninteractive apt-get update -yqqq 1>/dev/null\nDEBIAN_FRONTEND=noninteractive apt-get install strongswan bird -yqqq 1>/dev/null\n\ncat > /etc/bird/bird.conf <<EOF\nrouter id {{LocalBGPPeer}};\nprotocol device {\n    scan time 10;\n}\nprotocol static static_bgp {\n    route 0.0.0.0/0 via {{PrivateIP}};\n}\nprotocol kernel {\n    export filter {\n        if proto = \"static_bgp\" then reject;\n        krt_prefsrc = {{PrivateIP}};\n        accept;\n    };\n    import none;\n}\nprotocol bgp vwan\n{\n    keepalive time 20;\n    hold time 60;\n    graceful restart aware;\n    import all;\n    export where proto = \"static_bgp\";\n    local {{LocalBGPPeer}} as {{LocalASN}};\n    neighbor {{RemoteBGPPeer}} as {{RemoteASN}};\n}\nEOF\n\ncat > /etc/ipsec.conf <<EOF\nconfig setup\n    uniqueids=yes\n    strictcrlpolicy=no\nconn %default\n    authby=secret\n    ike=aes256-sha2_256-modp1024!\n    esp=aes256-sha2_256!\n    keyingtries=0\n    dpdaction=restart\nconn vwan0\n    left={{PrivateIP}}\n    leftsubnet=0.0.0.0/0\n    right={{VWanPIP}}\n    rightsubnet=0.0.0.0/0\n    auto=start\n    mark=%unique\n    leftupdown=\"/etc/ipsec-vti.sh 0 {{RemoteBGPPeer}}/30 {{LocalBGPPeer}}/30\"\nEOF\n\ncat > /etc/ipsec.secrets <<EOF\n{{PrivateIP}} {{VWanPIP}} : PSK \"{{SharedKey}}\"\nEOF\n\ncat > /etc/strongswan.d/charon.conf <<EOF\ncharon {\n    install_routes = no\n}\nEOF\n\ncat > /etc/ipsec-vti.sh <<EOF\n#!/bin/bash\nset -o nounset\nset -o errexit\n\nIP=\\$(which ip)\nIPTABLES=\\$(which iptables)\n\nPLUTO_MARK_OUT_ARR=(\\${PLUTO_MARK_OUT//// })\nPLUTO_MARK_IN_ARR=(\\${PLUTO_MARK_IN//// })\n\nVTI_TUNNEL_ID=\\${1}\nVTI_REMOTE=\\${2}\nVTI_LOCAL=\\${3}\n\nLOCAL_IF=\"\\${PLUTO_INTERFACE}\"\nVTI_IF=\"vti\\${VTI_TUNNEL_ID}\"\n\n# ipsec overhead is 73 bytes\nVTI_MTU=$((1460-73))\n\ncase \"\\${PLUTO_VERB}\" in\n    up-client)\n        \\${IP} link add \\${VTI_IF} type vti local \\${PLUTO_ME} remote \\${PLUTO_PEER} okey \\${PLUTO_MARK_OUT_ARR[0]} ikey \\${PLUTO_MARK_IN_ARR[0]}\n        \\${IP} addr add \\${VTI_LOCAL} remote \\${VTI_REMOTE} dev \"\\${VTI_IF}\"\n        \\${IP} link set \\${VTI_IF} up mtu \\${VTI_MTU}\n        sysctl -w net.ipv4.conf.\\${VTI_IF}.disable_policy=1\n        sysctl -w net.ipv4.conf.\\${VTI_IF}.rp_filter=2 || sysctl -w net.ipv4.conf.\\${VTI_IF}.rp_filter=0\n        \\${IPTABLES} -t mangle -I FORWARD -o \\${VTI_IF} -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu\n        \\${IPTABLES} -t mangle -I INPUT -p esp -s \\${PLUTO_PEER} -d \\${PLUTO_ME} -j MARK --set-xmark \\${PLUTO_MARK_IN}\n        \\${IP} route flush table 220\n        ;;\n    down-client)\n        \\${IP} tunnel del \"\\${VTI_IF}\"\n        ;;\nesac\n\nsysctl -w net.ipv4.ip_forward=1\nsysctl -w net.ipv4.conf.\\${LOCAL_IF}.disable_xfrm=1\nsysctl -w net.ipv4.conf.\\${LOCAL_IF}.disable_policy=1\nEOF\n\nchmod +x /etc/ipsec-vti.sh\n\nsystemctl restart bird 2>1\n\nipsec restart 2>1\nipsec up vwan0 2>1\n\necho \"done!\"\nexit 0",
                     "_script01": "[replace(variables('_script00'), '{{PrivateIP}}', parameters('privateIp'))]",
                     "_script02": "[replace(variables('_script01'), '{{VWanPIP}}', parameters('vwanPip'))]",
                     "_script03": "[replace(variables('_script02'), '{{SharedKey}}', parameters('sharedKey'))]",

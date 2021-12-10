@@ -61,6 +61,7 @@ resource zoneRouteTables 'Microsoft.Network/virtualHubs/hubRouteTables@2021-03-0
   }
 }]
 
+@batchSize(1)
 resource vnetConnections 'Microsoft.Network/virtualHubs/hubVirtualNetworkConnections@2021-03-01' = [for vnet in vnets: {
   name: last(split(vnet.id, '/'))
   parent: vwanHub

@@ -2,8 +2,8 @@
 sed -ir 's/#* *net.ipv4.ip_forward *= *[01]/net.ipv4.ip_forward = 1/g' /etc/sysctl.conf
 sysctl -p
 
-DEBIAN_FRONTEND=noninteractive apt-get update -yqqq
-DEBIAN_FRONTEND=noninteractive apt-get install strongswan bird -yqqq
+DEBIAN_FRONTEND=noninteractive apt-get update -yqqq 1>/dev/null
+DEBIAN_FRONTEND=noninteractive apt-get install strongswan bird -yqqq 1>/dev/null
 
 cat > /etc/bird/bird.conf <<EOF
 router id {{LocalBGPPeer}};

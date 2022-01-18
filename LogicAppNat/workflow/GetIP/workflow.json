@@ -1,0 +1,38 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "HTTP": {
+        "inputs": {
+          "method": "GET",
+          "uri": "https://api.ipify.org/?format=json"
+        },
+        "runAfter": {},
+        "type": "Http"
+      },
+      "Response": {
+        "inputs": {
+          "body": "@body('HTTP')",
+          "statusCode": "@outputs('HTTP')['statusCode']"
+        },
+        "kind": "http",
+        "runAfter": {
+          "HTTP": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {},
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateless"
+}

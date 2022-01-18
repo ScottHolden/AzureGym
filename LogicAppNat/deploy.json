@@ -1,0 +1,222 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.4.1124.51302",
+      "templateHash": "6852268878537676174"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "AustraliaEast",
+      "metadata": {
+        "description": "The location for all resources to be deployed"
+      }
+    },
+    "prefix": {
+      "type": "string",
+      "defaultValue": "Demo",
+      "metadata": {
+        "description": "The prefix to be used for all resource names, should only be alphanumeric"
+      }
+    },
+    "workflowZipUrl": {
+      "type": "string",
+      "defaultValue": "https://raw.githubusercontent.com/ScottHolden/AzureGym/main/LogicAppNat/workflow.zip",
+      "metadata": {
+        "description": "The URL of the workflow Zip, used to provide a single-click deploy demo. Leave empty to skip workflow deployment"
+      }
+    }
+  },
+  "variables": {
+    "uniqueName": "[format('{0}{1}', toLower(parameters('prefix')), uniqueString(parameters('prefix'), resourceGroup().id))]",
+    "subnetName": "LogicApp",
+    "subnetCIDR": "10.250.250.0/24"
+  },
+  "resources": [
+    {
+      "condition": "[not(empty(trim(parameters('workflowZipUrl'))))]",
+      "type": "Microsoft.Web/sites/extensions",
+      "apiVersion": "2021-02-01",
+      "name": "[format('{0}/{1}', variables('uniqueName'), 'MSDeploy')]",
+      "properties": {
+        "packageUri": "[parameters('workflowZipUrl')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2021-02-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "maximumElasticWorkerCount": 20,
+        "zoneRedundant": false
+      },
+      "sku": {
+        "tier": "WorkflowStandard",
+        "name": "WS1"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2021-06-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2"
+      },
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2"
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2021-05-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIPAddressVersion": "IPv4",
+        "publicIPAllocationMethod": "Static"
+      },
+      "sku": {
+        "name": "Standard"
+      }
+    },
+    {
+      "type": "Microsoft.Network/natGateways",
+      "apiVersion": "2021-05-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIpAddresses": [
+          {
+            "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('uniqueName'))]"
+          }
+        ]
+      },
+      "sku": {
+        "name": "Standard"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2021-05-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('subnetCIDR')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('subnetCIDR')]",
+              "natGateway": {
+                "id": "[resourceId('Microsoft.Network/natGateways', variables('uniqueName'))]"
+              },
+              "delegations": [
+                {
+                  "name": "delegation",
+                  "properties": {
+                    "serviceName": "Microsoft.Web/serverFarms"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/natGateways', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2021-02-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp,workflowapp",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('uniqueName'))]",
+        "virtualNetworkSubnetId": "[reference(resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName'))).subnets[0].id]",
+        "httpsOnly": true,
+        "clientAffinityEnabled": false,
+        "siteConfig": {
+          "vnetRouteAllEnabled": true,
+          "use32BitWorkerProcess": false,
+          "cors": {},
+          "appSettings": [
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~3"
+            },
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "node"
+            },
+            {
+              "name": "WEBSITE_NODE_DEFAULT_VERSION",
+              "value": "~12"
+            },
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', variables('uniqueName'), listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('uniqueName')), '2021-06-01').keys[0].value, environment().suffixes.storage)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', variables('uniqueName'), listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('uniqueName')), '2021-06-01').keys[0].value, environment().suffixes.storage)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTSHARE",
+              "value": "[variables('uniqueName')]"
+            },
+            {
+              "name": "AzureFunctionsJobHost__extensionBundle__id",
+              "value": "Microsoft.Azure.Functions.ExtensionBundle.Workflows"
+            },
+            {
+              "name": "AzureFunctionsJobHost__extensionBundle__version",
+              "value": "[1.*, 2.0.0)"
+            },
+            {
+              "name": "APP_KIND",
+              "value": "workflowApp"
+            }
+          ]
+        }
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('uniqueName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('uniqueName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "LogicAppName": {
+      "type": "string",
+      "value": "[variables('uniqueName')]"
+    },
+    "OutboundIP": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('uniqueName'))).ipAddress]"
+    }
+  }
+}

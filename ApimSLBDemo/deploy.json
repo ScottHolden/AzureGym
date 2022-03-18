@@ -1,0 +1,743 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.4.1272.37030",
+      "templateHash": "8770722040195818495"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "prefix": {
+      "type": "string",
+      "defaultValue": "demo"
+    },
+    "publisherEmail": {
+      "type": "string",
+      "defaultValue": "no-reply@microsoft.com"
+    },
+    "vmSku": {
+      "type": "string",
+      "defaultValue": "Standard_D2s_v4"
+    },
+    "vmUsername": {
+      "type": "string",
+      "defaultValue": "demovm"
+    },
+    "vmPassword": {
+      "type": "string",
+      "defaultValue": "[format('Pw{0}!', uniqueString(newGuid()))]"
+    },
+    "vmCount": {
+      "type": "int",
+      "defaultValue": 6
+    }
+  },
+  "variables": {
+    "uniqueName": "[format('{0}{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix')))]",
+    "addressSpace": "10.250.0.0/16",
+    "slbName": "[variables('uniqueName')]",
+    "apimSubnetName": "apim",
+    "apimSubnetPrefix": "10.250.1.0/24",
+    "backendSubnetName": "backend",
+    "backendSubnetPrefix": "10.250.2.0/24",
+    "backendSLB": "10.250.2.250",
+    "appGwSubnetName": "appgw",
+    "appGwSubnetPrefix": "10.250.3.0/24",
+    "backendAppGw": "10.250.3.250",
+    "backendPoolName": "backendPool",
+    "probeName": "httpProbe",
+    "appGwName": "[variables('uniqueName')]",
+    "slbPath": "slb",
+    "appgwPath": "appgw",
+    "uiPath": "ui",
+    "vmssScript": "[base64('#!/bin/bash\r\napt update -y\r\napt install nginx -y\r\ncurl -H Metadata:true --noproxy \"*\" -o /var/www/html/id.txt \"http://169.254.169.254/metadata/instance/compute/name?api-version=2021-01-01&format=text\"\r\n')]",
+    "apiPolicy": "<policies>\r\n    <inbound>\r\n        <base />\r\n        <rewrite-uri template=\"id.txt\" />\r\n        <set-header name=\"Ocp-Apim-Subscription-Key\" exists-action=\"delete\" />\r\n    </inbound>\r\n    <backend>\r\n        <base />\r\n    </backend>\r\n    <outbound>\r\n        <base />\r\n    </outbound>\r\n    <on-error>\r\n        <base />\r\n    </on-error>\r\n</policies>\r\n",
+    "uiPolicy": "<policies>\r\n    <inbound>\r\n        <mock-response status-code=\"200\" content-type=\"text/html\" />\r\n        <base />\r\n    </inbound>\r\n    <backend>\r\n        <base />\r\n    </backend>\r\n    <outbound>\r\n        <base />\r\n    </outbound>\r\n    <on-error>\r\n        <base />\r\n    </on-error>\r\n</policies>\r\n",
+    "uiResponse": {
+      "statusCode": 200,
+      "representations": [
+        {
+          "contentType": "text/html",
+          "examples": {
+            "default": {
+              "value": "<!DOCTYPE html><html><head><title>API Query Graph</title>\r\n<style>#graph,#log,body,html{padding:0;margin:0}body,html{width:100%;height:100%;overflow:hidden}#graph,#log{width:100vw;height:100%}#graph{background-color:#ccc}#log{background-color:#999;overflow-y:scroll}</style>\r\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js\"></script>\r\n</head><body><canvas id=\"graph\"></canvas><pre id=\"log\"></pre>\r\n<script>\r\nconst counts = {}; const logPre = document.getElementById(\"log\");\r\nconst colors = Array.from({ length: 6 }, () => [[255, 99, 132], [255, 159, 64], [255, 205, 86], [75, 192, 192], [153, 102, 255]]).flat();\r\nconst graph = new Chart(document.getElementById('graph'), { type: 'bar', data: { labels: [],datasets: [{data: [],borderWidth: 1,backgroundColor: colors.map(x => \"rgba(\" + x + \",0.4)\"),borderColor: colors.map(x => \"rgb(\" + x + \")\"),}]},});\r\nconst timePrefix = () => \" [\" + new Date().toLocaleString().replace(',', '') + \"]  \";\r\nconst log = x => logPre.innerText = timePrefix() + x + \"\\n\" + logPre.innerText;\r\nconst logError = x => log(\"Error: \" + x);\r\nconst update = x => {\r\n    const id = counts[x] ?? (counts[x] = graph.data.labels.length)\r\n    graph.data.datasets[0].data[id] = (graph.data.datasets[0].data[id] ?? 0) + 1;\r\n    graph.data.labels[id] = x;\r\n    graph.update();\r\n}\r\nconst run = () => fetch('backend?t=' + Date.now())\r\n    .then(x => x.ok ? x.text() : Promise.reject(x.status))\r\n    .then(x => { log(x); update(x); })\r\n    .catch(logError);\r\nconst interval = Math.max(50, parseInt(new URLSearchParams(window.location.search).get('s') ?? 100));\r\nsetInterval(run, interval);\r\n</script>\r\n</body>\r\n</html>\r\n"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}/{2}/{3}', variables('uniqueName'), 'slbApi', 'slbApiGet', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('apiPolicy')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]",
+        "[resourceId('Microsoft.ApiManagement/service/apis', variables('uniqueName'), 'slbApi')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', variables('uniqueName'), 'slbApi', 'slbApiGet')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}/{2}/{3}', variables('uniqueName'), 'slbApi', 'slbUiGet', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('uiPolicy')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]",
+        "[resourceId('Microsoft.ApiManagement/service/apis', variables('uniqueName'), 'slbApi')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', variables('uniqueName'), 'slbApi', 'slbUiGet')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}/{2}', variables('uniqueName'), 'slbApi', 'slbApiGet')]",
+      "properties": {
+        "method": "get",
+        "urlTemplate": "/backend",
+        "displayName": "Get Backend ID"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]",
+        "[resourceId('Microsoft.ApiManagement/service/apis', variables('uniqueName'), 'slbApi')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}/{2}', variables('uniqueName'), 'slbApi', 'slbUiGet')]",
+      "properties": {
+        "method": "get",
+        "urlTemplate": "[format('/{0}', variables('uiPath'))]",
+        "displayName": "Get UI",
+        "responses": [
+          "[variables('uiResponse')]"
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]",
+        "[resourceId('Microsoft.ApiManagement/service/apis', variables('uniqueName'), 'slbApi')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}/{2}/{3}', variables('uniqueName'), 'appgwApi', 'appgwApiGet', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('apiPolicy')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]",
+        "[resourceId('Microsoft.ApiManagement/service/apis', variables('uniqueName'), 'appgwApi')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', variables('uniqueName'), 'appgwApi', 'appgwApiGet')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}/{2}/{3}', variables('uniqueName'), 'appgwApi', 'appgwUiGet', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('uiPolicy')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]",
+        "[resourceId('Microsoft.ApiManagement/service/apis', variables('uniqueName'), 'appgwApi')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', variables('uniqueName'), 'appgwApi', 'appgwUiGet')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}/{2}', variables('uniqueName'), 'appgwApi', 'appgwApiGet')]",
+      "properties": {
+        "method": "get",
+        "urlTemplate": "/backend",
+        "displayName": "Get Backend ID"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]",
+        "[resourceId('Microsoft.ApiManagement/service/apis', variables('uniqueName'), 'appgwApi')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}/{2}', variables('uniqueName'), 'appgwApi', 'appgwUiGet')]",
+      "properties": {
+        "method": "get",
+        "urlTemplate": "[format('/{0}', variables('uiPath'))]",
+        "displayName": "Get UI",
+        "responses": [
+          "[variables('uiResponse')]"
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]",
+        "[resourceId('Microsoft.ApiManagement/service/apis', variables('uniqueName'), 'appgwApi')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/loggers",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}', variables('uniqueName'), 'appins')]",
+      "properties": {
+        "loggerType": "applicationInsights",
+        "credentials": {
+          "instrumentationKey": "[reference(resourceId('Microsoft.Insights/components', variables('uniqueName'))).InstrumentationKey]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]",
+        "[resourceId('Microsoft.Insights/components', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}', variables('uniqueName'), 'slbApi')]",
+      "properties": {
+        "displayName": "SLB API",
+        "protocols": [
+          "http",
+          "https"
+        ],
+        "path": "[variables('slbPath')]",
+        "serviceUrl": "[format('http://{0}/', variables('backendSLB'))]",
+        "subscriptionRequired": false
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}', variables('uniqueName'), 'appgwApi')]",
+      "properties": {
+        "displayName": "AppGW API",
+        "protocols": [
+          "http",
+          "https"
+        ],
+        "path": "[variables('appgwPath')]",
+        "serviceUrl": "[format('http://{0}/', variables('backendAppGw'))]",
+        "subscriptionRequired": false
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2019-09-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('addressSpace')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('apimSubnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('apimSubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-apim', variables('uniqueName')))]"
+              }
+            }
+          },
+          {
+            "name": "[variables('backendSubnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('backendSubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('uniqueName'))]"
+              },
+              "natGateway": {
+                "id": "[resourceId('Microsoft.Network/natGateways', variables('uniqueName'))]"
+              }
+            }
+          },
+          {
+            "name": "[variables('appGwSubnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('appGwSubnetPrefix')]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-apim', variables('uniqueName')))]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('uniqueName'))]",
+        "[resourceId('Microsoft.Network/natGateways', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2021-05-01",
+      "name": "[format('{0}-nat', variables('uniqueName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIPAllocationMethod": "Static"
+      },
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      }
+    },
+    {
+      "type": "Microsoft.Network/natGateways",
+      "apiVersion": "2021-05-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "publicIpAddresses": [
+          {
+            "id": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-nat', variables('uniqueName')))]"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-nat', variables('uniqueName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2021-12-01-preview",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02-preview",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('uniqueName'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2021-08-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2"
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2019-02-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": []
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2019-02-01",
+      "name": "[format('{0}-apim', variables('uniqueName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "apim",
+            "properties": {
+              "priority": 320,
+              "protocol": "Tcp",
+              "access": "Allow",
+              "direction": "Inbound",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRanges": [
+                "80",
+                "443",
+                "3443",
+                "6390"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2021-05-01",
+      "name": "[format('{0}-apim', variables('uniqueName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "dnsSettings": {
+          "domainNameLabel": "[variables('uniqueName')]"
+        }
+      },
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service",
+      "apiVersion": "2021-08-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "capacity": 1,
+        "name": "Developer"
+      },
+      "properties": {
+        "publisherEmail": "[parameters('publisherEmail')]",
+        "publisherName": "[variables('uniqueName')]",
+        "publicIpAddressId": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-apim', variables('uniqueName')))]",
+        "virtualNetworkType": "External",
+        "virtualNetworkConfiguration": {
+          "subnetResourceId": "[format('{0}/subnets/{1}', resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName')), variables('apimSubnetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-apim', variables('uniqueName')))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2021-05-01",
+      "name": "[format('{0}-appgw', variables('uniqueName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIPAllocationMethod": "Static"
+      },
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      }
+    },
+    {
+      "type": "Microsoft.Network/applicationGateways",
+      "apiVersion": "2021-05-01",
+      "name": "[variables('appGwName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "enableHttp2": false,
+        "sku": {
+          "name": "Standard_v2",
+          "tier": "Standard_v2",
+          "capacity": 1
+        },
+        "gatewayIPConfigurations": [
+          {
+            "name": "appGatewayIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[format('{0}/subnets/{1}', resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName')), variables('appGwSubnetName'))]"
+              }
+            }
+          }
+        ],
+        "frontendIPConfigurations": [
+          {
+            "name": "appGwPublicFrontendIp",
+            "properties": {
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-appgw', variables('uniqueName')))]"
+              }
+            }
+          },
+          {
+            "name": "appGwFrontendIp",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[variables('backendAppGw')]",
+              "subnet": {
+                "id": "[format('{0}/subnets/{1}', resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName')), variables('appGwSubnetName'))]"
+              }
+            }
+          }
+        ],
+        "frontendPorts": [
+          {
+            "name": "http",
+            "properties": {
+              "port": 80
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[variables('backendPoolName')]",
+            "properties": {}
+          }
+        ],
+        "backendHttpSettingsCollection": [
+          {
+            "name": "http",
+            "properties": {
+              "port": 80,
+              "protocol": "Http",
+              "cookieBasedAffinity": "Disabled",
+              "pickHostNameFromBackendAddress": true,
+              "requestTimeout": 20
+            }
+          }
+        ],
+        "httpListeners": [
+          {
+            "name": "httpListener",
+            "properties": {
+              "protocol": "Http",
+              "requireServerNameIndication": false,
+              "frontendIPConfiguration": {
+                "id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', variables('appGwName'), 'appGwFrontendIp')]"
+              },
+              "frontendPort": {
+                "id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts', variables('appGwName'), 'http')]"
+              }
+            }
+          }
+        ],
+        "requestRoutingRules": [
+          {
+            "name": "httpRouting",
+            "properties": {
+              "ruleType": "Basic",
+              "httpListener": {
+                "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', variables('appGwName'), 'httpListener')]"
+              },
+              "backendAddressPool": {
+                "id": "[resourceId('Microsoft.Network/applicationGateways/backendAddressPools', variables('appGwName'), variables('backendPoolName'))]"
+              },
+              "backendHttpSettings": {
+                "id": "[resourceId('Microsoft.Network/applicationGateways/backendHttpSettingsCollection', variables('appGwName'), 'http')]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-appgw', variables('uniqueName')))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/loadBalancers",
+      "apiVersion": "2021-05-01",
+      "name": "[variables('slbName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      },
+      "properties": {
+        "frontendIPConfigurations": [
+          {
+            "name": "internal",
+            "properties": {
+              "subnet": {
+                "id": "[format('{0}/subnets/{1}', resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName')), variables('backendSubnetName'))]"
+              },
+              "privateIPAddressVersion": "IPv4",
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[variables('backendSLB')]"
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[variables('backendPoolName')]"
+          }
+        ],
+        "probes": [
+          {
+            "name": "[variables('probeName')]",
+            "properties": {
+              "port": 80,
+              "protocol": "Tcp"
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "http",
+            "properties": {
+              "protocol": "Tcp",
+              "frontendPort": 80,
+              "backendPort": 80,
+              "idleTimeoutInMinutes": 4,
+              "probe": {
+                "id": "[resourceId('Microsoft.Network/loadBalancers/probes', variables('slbName'), variables('probeName'))]"
+              },
+              "frontendIPConfiguration": {
+                "id": "[resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations', variables('slbName'), 'internal')]"
+              },
+              "backendAddressPool": {
+                "id": "[resourceId('Microsoft.Network/loadBalancers/backendAddressPools', variables('slbName'), variables('backendPoolName'))]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachineScaleSets",
+      "apiVersion": "2021-03-01",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('vmSku')]",
+        "capacity": "[parameters('vmCount')]"
+      },
+      "properties": {
+        "overprovision": false,
+        "singlePlacementGroup": false,
+        "upgradePolicy": {
+          "mode": "Automatic"
+        },
+        "virtualMachineProfile": {
+          "storageProfile": {
+            "osDisk": {
+              "osType": "Linux",
+              "createOption": "FromImage",
+              "caching": "ReadWrite",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              },
+              "diskSizeGB": 30
+            },
+            "imageReference": {
+              "publisher": "canonical",
+              "offer": "0001-com-ubuntu-server-focal",
+              "sku": "20_04-lts-gen2",
+              "version": "latest"
+            }
+          },
+          "osProfile": {
+            "computerNamePrefix": "chaosvmss",
+            "adminUsername": "[parameters('vmUsername')]",
+            "adminPassword": "[parameters('vmPassword')]"
+          },
+          "diagnosticsProfile": {
+            "bootDiagnostics": {
+              "enabled": true,
+              "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('uniqueName'))).primaryEndpoints.blob]"
+            }
+          },
+          "extensionProfile": {
+            "extensions": [
+              {
+                "name": "CustomScript",
+                "properties": {
+                  "type": "CustomScript",
+                  "publisher": "Microsoft.Azure.Extensions",
+                  "typeHandlerVersion": "2.0",
+                  "autoUpgradeMinorVersion": true,
+                  "settings": {
+                    "script": "[variables('vmssScript')]"
+                  }
+                }
+              },
+              {
+                "name": "OMSExtension",
+                "properties": {
+                  "type": "OmsAgentForLinux",
+                  "publisher": "Microsoft.EnterpriseCloud.Monitoring",
+                  "typeHandlerVersion": "1.13",
+                  "settings": {
+                    "workspaceId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('uniqueName'))).customerId]"
+                  },
+                  "protectedSettings": {
+                    "workspaceKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', variables('uniqueName')), '2021-12-01-preview').primarySharedKey]"
+                  }
+                }
+              }
+            ]
+          },
+          "networkProfile": {
+            "networkInterfaceConfigurations": [
+              {
+                "name": "[format('{0}-nic', variables('uniqueName'))]",
+                "properties": {
+                  "primary": true,
+                  "enableAcceleratedNetworking": true,
+                  "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('uniqueName'))]"
+                  },
+                  "ipConfigurations": [
+                    {
+                      "name": "ipconfig1",
+                      "properties": {
+                        "primary": true,
+                        "subnet": {
+                          "id": "[format('{0}/subnets/{1}', resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName')), variables('backendSubnetName'))]"
+                        },
+                        "loadBalancerBackendAddressPools": [
+                          {
+                            "id": "[format('{0}/backendAddressPools/{1}', resourceId('Microsoft.Network/loadBalancers', variables('slbName')), variables('backendPoolName'))]"
+                          }
+                        ],
+                        "applicationGatewayBackendAddressPools": [
+                          {
+                            "id": "[format('{0}/backendAddressPools/{1}', resourceId('Microsoft.Network/applicationGateways', variables('appGwName')), variables('backendPoolName'))]"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/applicationGateways', variables('appGwName'))]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('uniqueName'))]",
+        "[resourceId('Microsoft.Network/loadBalancers', variables('slbName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('uniqueName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('uniqueName'))]",
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('uniqueName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "slbUIEndpoint": {
+      "type": "string",
+      "value": "[format('{0}/{1}/{2}', reference(resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))).gatewayUrl, variables('slbPath'), variables('uiPath'))]"
+    },
+    "appgwUIEndpoint": {
+      "type": "string",
+      "value": "[format('{0}/{1}/{2}', reference(resourceId('Microsoft.ApiManagement/service', variables('uniqueName'))).gatewayUrl, variables('appgwPath'), variables('uiPath'))]"
+    }
+  }
+}

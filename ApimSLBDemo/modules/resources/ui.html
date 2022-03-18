@@ -1,0 +1,26 @@
+<!DOCTYPE html><html><head><title>API Query Graph</title>
+<style>#graph,#log,body,html{padding:0;margin:0}body,html{width:100%;height:100%;overflow:hidden}#graph,#log{width:100vw;height:100%}#graph{background-color:#ccc}#log{background-color:#999;overflow-y:scroll}</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head><body><canvas id="graph"></canvas><pre id="log"></pre>
+<script>
+const counts = {}; const logPre = document.getElementById("log");
+const colors = Array.from({ length: 6 }, () => [[255, 99, 132], [255, 159, 64], [255, 205, 86], [75, 192, 192], [153, 102, 255]]).flat();
+const graph = new Chart(document.getElementById('graph'), { type: 'bar', data: { labels: [],datasets: [{data: [],borderWidth: 1,backgroundColor: colors.map(x => "rgba(" + x + ",0.4)"),borderColor: colors.map(x => "rgb(" + x + ")"),}]},});
+const timePrefix = () => " [" + new Date().toLocaleString().replace(',', '') + "]  ";
+const log = x => logPre.innerText = timePrefix() + x + "\n" + logPre.innerText;
+const logError = x => log("Error: " + x);
+const update = x => {
+    const id = counts[x] ?? (counts[x] = graph.data.labels.length)
+    graph.data.datasets[0].data[id] = (graph.data.datasets[0].data[id] ?? 0) + 1;
+    graph.data.labels[id] = x;
+    graph.update();
+}
+const run = () => fetch('backend?t=' + Date.now())
+    .then(x => x.ok ? x.text() : Promise.reject(x.status))
+    .then(x => { log(x); update(x); })
+    .catch(logError);
+const interval = Math.max(50, parseInt(new URLSearchParams(window.location.search).get('s') ?? 100));
+setInterval(run, interval);
+</script>
+</body>
+</html>

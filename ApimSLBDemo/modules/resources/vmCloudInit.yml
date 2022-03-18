@@ -1,0 +1,7 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - nginx
+runcmd:
+  - curl -H Metadata:true --noproxy "*" -o /var/www/html/id.txt "http://169.254.169.254/metadata/instance/compute/name?api-version=2021-01-01&format=text"

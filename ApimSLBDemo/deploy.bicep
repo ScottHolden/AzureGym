@@ -29,8 +29,10 @@ var uiPath = 'ui'
 
 var vmssScript = base64('''
 #!/bin/bash
-apt update -y
-apt install nginx -y
+sleep 30
+apt-get update -y
+apt-get update -y
+apt-get install nginx -y
 curl -H Metadata:true --noproxy "*" -o /var/www/html/id.txt "http://169.254.169.254/metadata/instance/compute/name?api-version=2021-01-01&format=text"
 ''')
 

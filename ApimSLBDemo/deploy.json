@@ -4,8 +4,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.4.1272.37030",
-      "templateHash": "8770722040195818495"
+      "version": "0.4.1318.3566",
+      "templateHash": "13455882015499399208"
     }
   },
   "parameters": {
@@ -56,7 +56,7 @@
     "slbPath": "slb",
     "appgwPath": "appgw",
     "uiPath": "ui",
-    "vmssScript": "[base64('#!/bin/bash\r\napt update -y\r\napt install nginx -y\r\ncurl -H Metadata:true --noproxy \"*\" -o /var/www/html/id.txt \"http://169.254.169.254/metadata/instance/compute/name?api-version=2021-01-01&format=text\"\r\n')]",
+    "vmssScript": "[base64('#!/bin/bash\r\nsleep 30\r\napt-get update -y\r\napt-get update -y\r\napt-get install nginx -y\r\ncurl -H Metadata:true --noproxy \"*\" -o /var/www/html/id.txt \"http://169.254.169.254/metadata/instance/compute/name?api-version=2021-01-01&format=text\"\r\n')]",
     "apiPolicy": "<policies>\r\n    <inbound>\r\n        <base />\r\n        <rewrite-uri template=\"id.txt\" />\r\n        <set-header name=\"Ocp-Apim-Subscription-Key\" exists-action=\"delete\" />\r\n    </inbound>\r\n    <backend>\r\n        <base />\r\n    </backend>\r\n    <outbound>\r\n        <base />\r\n    </outbound>\r\n    <on-error>\r\n        <base />\r\n    </on-error>\r\n</policies>\r\n",
     "uiPolicy": "<policies>\r\n    <inbound>\r\n        <mock-response status-code=\"200\" content-type=\"text/html\" />\r\n        <base />\r\n    </inbound>\r\n    <backend>\r\n        <base />\r\n    </backend>\r\n    <outbound>\r\n        <base />\r\n    </outbound>\r\n    <on-error>\r\n        <base />\r\n    </on-error>\r\n</policies>\r\n",
     "uiResponse": {

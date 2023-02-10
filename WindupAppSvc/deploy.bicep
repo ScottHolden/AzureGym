@@ -4,42 +4,32 @@ param location string = resourceGroup().location
 @description('A prefix to add to the start of all resource names. Note: A "unique" suffix will also be added')
 param prefix string = 'windup'
 
-@description('The windup container image to use')
-param containerImage string = 'eggboy/windup:6.1.2'
+@description('*Leave blank to build a new container* Container image to use')
+param containerImageOverride string = 'eggboy/windup:6.1.2'
 
 var uniqueName = '${toLower(prefix)}${uniqueString(prefix, resourceGroup().id)}'
 
-resource appServicePlan 'Microsoft.Web/serverfarms@2022-03-01' = {
-  name: uniqueName
-  location: location
-  sku: {
-    name: 'B2'
-  }
-  kind: 'linux'
-  properties: {
-    reserved: true
+var buildSourceRepo = 'https://github.com/ScottHolden/AzureGym.git'
+var buildDockerFilePath = 'AzureGym/WindupAppSvc/windup/Dockerfile'
+
+module containerBuild 'modules/containerBuild.bicep' = if(empty(containerImageOverride)) {
+  name: '${deployment().name}-build'
+  params: {
+    location: location
+    uniqueName: uniqueName
+    sourceRepo: buildSourceRepo
+    dockerFilePath: buildDockerFilePath
   }
 }
 
-resource webapp 'Microsoft.Web/sites@2016-08-01' = {
-  name: uniqueName
-  location: location
-  properties: {
-    siteConfig: {
-      appSettings: [
-        {
-          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
-          value: 'true'
-        }
-        {
-          name: 'WEBSITES_PORT'
-          value: '8080'
-        }
-      ]
-      linuxFxVersion: 'DOCKER|${containerImage}'
-    }
-    serverFarmId: appServicePlan.id
+module appSvc 'modules/appSvc.bicep' = {
+  name:'${deployment().name}-appsvc'
+  params: {
+    location: location
+    uniqueName: uniqueName
+    containerImage: empty(containerImageOverride) ? containerBuild.outputs.containerImage : containerImageOverride
+    acrUserManagedIdentityID: empty(containerImageOverride) ? containerBuild.outputs.containerPullIdentityId : ''
   }
 }
 
-output windupUrl string = 'https://${webapp.properties.defaultHostName}/'
+output windupUrl string = appSvc.outputs.url

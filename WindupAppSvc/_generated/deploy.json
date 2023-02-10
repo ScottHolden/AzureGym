@@ -1,0 +1,271 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.14.46.61228",
+      "templateHash": "8787087694062646915"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "The location all resources will be deployed to"
+      }
+    },
+    "prefix": {
+      "type": "string",
+      "defaultValue": "windup",
+      "metadata": {
+        "description": "A prefix to add to the start of all resource names. Note: A \"unique\" suffix will also be added"
+      }
+    },
+    "containerImageOverride": {
+      "type": "string",
+      "defaultValue": "eggboy/windup:6.1.2",
+      "metadata": {
+        "description": "*Leave blank to build a new container* Container image to use"
+      }
+    }
+  },
+  "variables": {
+    "uniqueName": "[format('{0}{1}', toLower(parameters('prefix')), uniqueString(parameters('prefix'), resourceGroup().id))]",
+    "buildSourceRepo": "https://github.com/ScottHolden/AzureGym.git",
+    "buildDockerFilePath": "AzureGym/WindupAppSvc/windup/Dockerfile"
+  },
+  "resources": [
+    {
+      "condition": "[empty(parameters('containerImageOverride'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-build', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "uniqueName": {
+            "value": "[variables('uniqueName')]"
+          },
+          "sourceRepo": {
+            "value": "[variables('buildSourceRepo')]"
+          },
+          "dockerFilePath": {
+            "value": "[variables('buildDockerFilePath')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.14.46.61228",
+              "templateHash": "16187886529652273363"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "uniqueName": {
+              "type": "string"
+            },
+            "sourceRepo": {
+              "type": "string"
+            },
+            "dockerFilePath": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "imageName": "[format('{0}/windup:v1', parameters('uniqueName'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2023-01-01-preview",
+              "name": "[parameters('uniqueName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard"
+              },
+              "properties": {
+                "adminUserEnabled": false
+              }
+            },
+            {
+              "type": "Microsoft.ContainerRegistry/registries/taskRuns",
+              "apiVersion": "2019-06-01-preview",
+              "name": "[format('{0}/{1}', parameters('uniqueName'), uniqueString(variables('imageName')))]",
+              "properties": {
+                "runRequest": {
+                  "type": "DockerBuildRequest",
+                  "dockerFilePath": "[parameters('dockerFilePath')]",
+                  "imageNames": [
+                    "[variables('imageName')]"
+                  ],
+                  "isPushEnabled": true,
+                  "sourceLocation": "[parameters('sourceRepo')]",
+                  "platform": {
+                    "os": "Linux",
+                    "architecture": "amd64"
+                  },
+                  "agentConfiguration": {
+                    "cpu": 2
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ContainerRegistry/registries', parameters('uniqueName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2021-09-30-preview",
+              "name": "[format('{0}-containerpull', parameters('uniqueName'))]",
+              "location": "[parameters('location')]"
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2020-10-01-preview",
+              "scope": "[format('Microsoft.ContainerRegistry/registries/{0}', parameters('uniqueName'))]",
+              "name": "[guid(parameters('uniqueName'), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-containerpull', parameters('uniqueName'))), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d'))]",
+              "properties": {
+                "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-containerpull', parameters('uniqueName'))), '2021-09-30-preview').principalId]",
+                "principalType": "ServicePrincipal",
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-containerpull', parameters('uniqueName')))]",
+                "[resourceId('Microsoft.ContainerRegistry/registries', parameters('uniqueName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "containerImage": {
+              "type": "string",
+              "value": "[format('{0}/{1}', reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('uniqueName')), '2023-01-01-preview').loginServer, variables('imageName'))]"
+            },
+            "containerPullIdentityId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-containerpull', parameters('uniqueName')))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-appsvc', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "uniqueName": {
+            "value": "[variables('uniqueName')]"
+          },
+          "containerImage": "[if(empty(parameters('containerImageOverride')), createObject('value', reference(resourceId('Microsoft.Resources/deployments', format('{0}-build', deployment().name)), '2020-10-01').outputs.containerImage.value), createObject('value', parameters('containerImageOverride')))]",
+          "acrUserManagedIdentityID": "[if(empty(parameters('containerImageOverride')), createObject('value', reference(resourceId('Microsoft.Resources/deployments', format('{0}-build', deployment().name)), '2020-10-01').outputs.containerPullIdentityId.value), createObject('value', ''))]"
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.14.46.61228",
+              "templateHash": "17811310741605916177"
+            }
+          },
+          "parameters": {
+            "uniqueName": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "containerImage": {
+              "type": "string"
+            },
+            "acrUserManagedIdentityID": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2022-03-01",
+              "name": "[parameters('uniqueName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "B3"
+              },
+              "kind": "linux",
+              "properties": {
+                "reserved": true
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2022-03-01",
+              "name": "[parameters('uniqueName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "siteConfig": {
+                  "acrUseManagedIdentityCreds": "[not(empty(parameters('acrUserManagedIdentityID')))]",
+                  "acrUserManagedIdentityID": "[parameters('acrUserManagedIdentityID')]",
+                  "alwaysOn": true,
+                  "appSettings": [
+                    {
+                      "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+                      "value": "true"
+                    },
+                    {
+                      "name": "WEBSITES_PORT",
+                      "value": "8080"
+                    }
+                  ],
+                  "linuxFxVersion": "[format('DOCKER|{0}', parameters('containerImage'))]"
+                },
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('uniqueName'))]"
+              },
+              "identity": "[if(empty(parameters('acrUserManagedIdentityID')), createObject(), createObject('type', 'UserAssigned', 'userAssignedIdentities', createObject(format('{0}', parameters('acrUserManagedIdentityID')), createObject())))]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('uniqueName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "url": {
+              "type": "string",
+              "value": "[format('https://{0}/', reference(resourceId('Microsoft.Web/sites', parameters('uniqueName')), '2022-03-01').defaultHostName)]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', format('{0}-build', deployment().name))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "windupUrl": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', format('{0}-appsvc', deployment().name)), '2020-10-01').outputs.url.value]"
+    }
+  }
+}

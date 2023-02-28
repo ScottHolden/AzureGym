@@ -1,0 +1,175 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.14.85.62628",
+      "templateHash": "18389119866904165678"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "The location all resources will be deployed to"
+      }
+    },
+    "additionalLocations": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "An array of additional regions to replicate images to"
+      }
+    },
+    "prefix": {
+      "type": "string",
+      "defaultValue": "devboxcustom",
+      "metadata": {
+        "description": "A prefix to add to the start of all resource names. Note: A \"unique\" suffix will also be added"
+      }
+    },
+    "imageName": {
+      "type": "string",
+      "defaultValue": "devboxCustImageDef",
+      "metadata": {
+        "description": "The name of the image to be created"
+      }
+    },
+    "imagePublisher": {
+      "type": "string",
+      "defaultValue": "myCompany",
+      "metadata": {
+        "description": "The name of the image publisher"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "Demo-Name": "DevBoxCustomImage",
+        "Demo-Repo": "https://github.com/ScottHolden/AzureGym/DevBoxCustomImage"
+      },
+      "metadata": {
+        "description": "Tags to be applied to all deployed resources"
+      }
+    }
+  },
+  "variables": {
+    "uniqueName": "[format('{0}{1}', toLower(parameters('prefix')), uniqueString(parameters('prefix'), resourceGroup().id))]",
+    "imageOffer": "devboxcustom",
+    "imageSku": "1-0-0",
+    "imageBuilderSku": "Standard_DS2_v2",
+    "imageBuilderDiskSize": 127,
+    "runOutputName": "aibCustWinManImg01"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Compute/galleries/images",
+      "apiVersion": "2022-03-03",
+      "name": "[format('{0}/{1}', variables('uniqueName'), parameters('imageName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "features": [
+          {
+            "name": "SecurityType",
+            "value": "TrustedLaunch"
+          }
+        ],
+        "identifier": {
+          "offer": "[variables('imageOffer')]",
+          "publisher": "[parameters('imagePublisher')]",
+          "sku": "[variables('imageSku')]"
+        },
+        "osState": "Generalized",
+        "osType": "Windows",
+        "hyperVGeneration": "V2"
+      },
+      "tags": "[parameters('tags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/galleries', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2018-11-30",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2020-10-01-preview",
+      "name": "[guid(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('uniqueName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('uniqueName')), '2018-11-30').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('uniqueName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/galleries",
+      "apiVersion": "2022-03-03",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "properties": {},
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.VirtualMachineImages/imageTemplates",
+      "apiVersion": "2022-02-14",
+      "name": "[variables('uniqueName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "buildTimeoutInMinutes": 100,
+        "vmProfile": {
+          "vmSize": "[variables('imageBuilderSku')]",
+          "osDiskSizeGB": "[variables('imageBuilderDiskSize')]"
+        },
+        "source": {
+          "type": "PlatformImage",
+          "publisher": "MicrosoftWindowsDesktop",
+          "offer": "Windows-11",
+          "sku": "win11-21h2-avd",
+          "version": "latest"
+        },
+        "customize": [
+          {
+            "type": "PowerShell",
+            "name": "Install Choco and Vscode",
+            "inline": [
+              "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))\"",
+              "choco install -y vscode"
+            ]
+          }
+        ],
+        "distribute": [
+          {
+            "galleryImageId": "[resourceId('Microsoft.Compute/galleries/images', variables('uniqueName'), parameters('imageName'))]",
+            "replicationRegions": "[concat(createArray(parameters('location')), parameters('additionalLocations'))]",
+            "runOutputName": "[variables('runOutputName')]",
+            "artifactTags": {
+              "source": "azureVmImageBuilder",
+              "baseosimg": "win11multi"
+            },
+            "type": "SharedImage"
+          }
+        ]
+      },
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('uniqueName')))]": {}
+        }
+      },
+      "tags": "[parameters('tags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('uniqueName'))]",
+        "[resourceId('Microsoft.Compute/galleries/images', variables('uniqueName'), parameters('imageName'))]"
+      ]
+    }
+  ]
+}

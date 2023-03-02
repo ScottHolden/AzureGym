@@ -1,0 +1,408 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.14.85.62628",
+      "templateHash": "11909109677543389847"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "The location all resources will be deployed to"
+      }
+    },
+    "prefix": {
+      "type": "string",
+      "defaultValue": "aksfleet",
+      "metadata": {
+        "description": "A prefix to add to the start of all resource names. Note: A \"unique\" suffix will also be added"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "Demo-Name": "AKSFleet",
+        "Demo-Repo": "https://github.com/ScottHolden/AzureGym/AKSFleet"
+      },
+      "metadata": {
+        "description": "Tags to be applied to all deployed resources"
+      }
+    }
+  },
+  "variables": {
+    "$fxv#0": {
+      "addressSpace": "10.197.0.0/16",
+      "gatewaySubnetAddressPrefix": "10.197.0.0/24",
+      "clusters": [
+        {
+          "cluserName": "ClusterA",
+          "nodePools": [
+            {
+              "name": "system",
+              "system": true,
+              "nodeSubnetAddressPrefix": "10.197.4.0/23",
+              "podSubnetAddressPrefix": "10.197.8.0/22",
+              "vmCount": 3,
+              "vmSize": "standard_d2s_v5"
+            },
+            {
+              "name": "shared",
+              "nodeSubnetAddressPrefix": "10.197.12.0/23",
+              "podSubnetAddressPrefix": "10.197.16.0/22",
+              "vmCountMin": 1,
+              "vmCountMax": 20,
+              "vmSize": "standard_d2s_v5"
+            }
+          ]
+        },
+        {
+          "cluserName": "ClusterB",
+          "nodePools": [
+            {
+              "name": "system",
+              "system": true,
+              "nodeSubnetAddressPrefix": "10.197.64.0/23",
+              "podSubnetAddressPrefix": "10.197.68.0/22",
+              "vmCount": 3,
+              "vmSize": "standard_d2s_v5"
+            },
+            {
+              "name": "shared",
+              "nodeSubnetAddressPrefix": "10.197.72.0/23",
+              "podSubnetAddressPrefix": "10.197.76.0/22",
+              "vmCountMin": 1,
+              "vmCountMax": 20,
+              "vmSize": "standard_d2s_v5"
+            }
+          ]
+        }
+      ]
+    },
+    "config": "[variables('$fxv#0')]",
+    "uniqueNameFormat": "[format('{0}-{{0}}-{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix')))]",
+    "uniqueShortNameFormat": "[toLower(format('{0}{{0}}{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix'))))]",
+    "nodeSubnetFormat": "aks-{0}-{1}-nodepool",
+    "podSubnetFormat": "aks-{0}-{1}-pods",
+    "nodeSubnets": "[flatten(map(variables('config').clusters, lambda('cluster', map(lambdaVariables('cluster').nodePools, lambda('nodePool', createObject('name', format(variables('nodeSubnetFormat'), lambdaVariables('cluster').cluserName, lambdaVariables('nodePool').name), 'addressPrefix', lambdaVariables('nodePool').nodeSubnetAddressPrefix))))))]",
+    "podSubnets": "[flatten(map(variables('config').clusters, lambda('cluster', map(lambdaVariables('cluster').nodePools, lambda('nodePool', createObject('name', format(variables('podSubnetFormat'), lambdaVariables('cluster').cluserName, lambdaVariables('nodePool').name), 'addressPrefix', lambdaVariables('nodePool').podSubnetAddressPrefix, 'aksDelegation', true()))))))]",
+    "gatewaySubnet": {
+      "name": "gateway",
+      "addressPrefix": "[variables('config').gatewaySubnetAddressPrefix]"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[format(variables('uniqueNameFormat'), 'workspace')]",
+      "location": "[parameters('location')]",
+      "properties": {},
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-vnet', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "vnetName": {
+            "value": "[format(variables('uniqueNameFormat'), 'vnet')]"
+          },
+          "addressSpace": {
+            "value": "[variables('config').addressSpace]"
+          },
+          "subnets": {
+            "value": "[concat(createArray(variables('gatewaySubnet')), variables('nodeSubnets'), variables('podSubnets'))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.14.85.62628",
+              "templateHash": "13199950734120967181"
+            }
+          },
+          "parameters": {
+            "vnetName": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "addressSpace": {
+              "type": "string"
+            },
+            "subnets": {
+              "type": "array"
+            },
+            "tags": {
+              "type": "object"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2022-05-01",
+              "name": "[parameters('vnetName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "addressSpace": {
+                  "addressPrefixes": [
+                    "[parameters('addressSpace')]"
+                  ]
+                },
+                "subnets": "[map(parameters('subnets'), lambda('subnet', createObject('name', lambdaVariables('subnet').name, 'properties', createObject('addressPrefix', lambdaVariables('subnet').addressPrefix, 'delegations', if(and(contains(lambdaVariables('subnet'), 'aksDelegation'), lambdaVariables('subnet').aksDelegation), createArray(createObject('name', 'aks-delegation', 'properties', createObject('serviceName', 'Microsoft.ContainerService/managedClusters'))), createArray())))))]"
+              },
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "subnetIdPrefix": {
+              "type": "string",
+              "value": "[format('{0}/subnets', resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName')))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "copy": {
+        "name": "aks",
+        "count": "[length(variables('config').clusters)]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-aks-{1}', deployment().name, variables('config').clusters[copyIndex()].cluserName)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "aksClusterName": {
+            "value": "[format(variables('uniqueNameFormat'), format('aks-{0}', variables('config').clusters[copyIndex()].cluserName))]"
+          },
+          "aksDnsPrefix": {
+            "value": "[toLower(take(format(variables('uniqueShortNameFormat'), variables('config').clusters[copyIndex()].cluserName), 24))]"
+          },
+          "logAnalyticsWorkspaceResourceID": {
+            "value": "[resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'workspace'))]"
+          },
+          "nodePools": {
+            "value": "[map(variables('config').clusters[copyIndex()].nodePools, lambda('nodePool', union(createObject('nodeSubnetId', format('{0}/{1}', reference(resourceId('Microsoft.Resources/deployments', format('{0}-vnet', deployment().name)), '2020-10-01').outputs.subnetIdPrefix.value, format(variables('nodeSubnetFormat'), variables('config').clusters[copyIndex()].cluserName, lambdaVariables('nodePool').name)), 'podSubnetId', format('{0}/{1}', reference(resourceId('Microsoft.Resources/deployments', format('{0}-vnet', deployment().name)), '2020-10-01').outputs.subnetIdPrefix.value, format(variables('podSubnetFormat'), variables('config').clusters[copyIndex()].cluserName, lambdaVariables('nodePool').name))), lambdaVariables('nodePool'))))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.14.85.62628",
+              "templateHash": "3449283888860795979"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "aksClusterName": {
+              "type": "string"
+            },
+            "aksDnsPrefix": {
+              "type": "string"
+            },
+            "nodePools": {
+              "type": "array"
+            },
+            "logAnalyticsWorkspaceResourceID": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object"
+            }
+          },
+          "variables": {
+            "nodeZones": "[pickZones('Microsoft.Compute', 'virtualMachines', parameters('location'), 3)]",
+            "defaultVmSize": "standard_d2s_v5",
+            "defaultVmCount": 1,
+            "systemNodeTaints": [
+              "CriticalAddonsOnly=true:NoSchedule"
+            ]
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ContainerService/managedClusters",
+              "apiVersion": "2022-07-02-preview",
+              "name": "[toLower(parameters('aksClusterName'))]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Basic",
+                "tier": "Paid"
+              },
+              "properties": {
+                "dnsPrefix": "[parameters('aksDnsPrefix')]",
+                "networkProfile": {
+                  "networkPlugin": "azure",
+                  "networkPolicy": "azure",
+                  "loadBalancerSku": "standard"
+                },
+                "agentPoolProfiles": "[map(parameters('nodePools'), lambda('nodePool', createObject('name', toLower(lambdaVariables('nodePool').name), 'mode', if(and(contains(lambdaVariables('nodePool'), 'system'), lambdaVariables('nodePool').system), 'System', 'User'), 'osType', 'Linux', 'type', 'VirtualMachineScaleSets', 'availabilityZones', variables('nodeZones'), 'vmSize', if(contains(lambdaVariables('nodePool'), 'vmSize'), lambdaVariables('nodePool').vmSize, variables('defaultVmSize')), 'count', if(contains(lambdaVariables('nodePool'), 'vmCount'), lambdaVariables('nodePool').vmCount, variables('defaultVmCount')), 'minCount', if(contains(lambdaVariables('nodePool'), 'vmCountMin'), lambdaVariables('nodePool').vmCountMin, null()), 'maxCount', if(contains(lambdaVariables('nodePool'), 'vmCountMax'), lambdaVariables('nodePool').vmCountMax, null()), 'enableAutoScaling', or(contains(lambdaVariables('nodePool'), 'vmCountMin'), contains(lambdaVariables('nodePool'), 'vmCountMax')), 'vnetSubnetID', lambdaVariables('nodePool').nodeSubnetId, 'podSubnetID', lambdaVariables('nodePool').podSubnetId, 'nodeTaints', if(and(contains(lambdaVariables('nodePool'), 'system'), lambdaVariables('nodePool').system), variables('systemNodeTaints'), createArray()))))]",
+                "aadProfile": {
+                  "enableAzureRBAC": true,
+                  "managed": true
+                },
+                "addonProfiles": {
+                  "omsagent": {
+                    "enabled": true,
+                    "config": {
+                      "logAnalyticsWorkspaceResourceID": "[parameters('logAnalyticsWorkspaceResourceID')]"
+                    }
+                  }
+                }
+              },
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "clusterName": {
+              "type": "string",
+              "value": "[toLower(parameters('aksClusterName'))]"
+            },
+            "clusterId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.ContainerService/managedClusters', toLower(parameters('aksClusterName')))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'workspace'))]",
+        "[resourceId('Microsoft.Resources/deployments', format('{0}-vnet', deployment().name))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-fleet', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "fleetName": {
+            "value": "[format(variables('uniqueNameFormat'), 'fleet')]"
+          },
+          "fleetDnsPrefix": {
+            "value": "[toLower(take(format(variables('uniqueShortNameFormat'), 'fleet'), 24))]"
+          },
+          "memberClusters": {
+            "copy": [
+              {
+                "name": "value",
+                "count": "[length(range(0, length(variables('config').clusters)))]",
+                "input": "[createObject('name', take(toLower(reference(resourceId('Microsoft.Resources/deployments', format('{0}-aks-{1}', deployment().name, variables('config').clusters[range(0, length(variables('config').clusters))[copyIndex('value')]].cluserName)), '2020-10-01').outputs.clusterName.value), 50), 'id', reference(resourceId('Microsoft.Resources/deployments', format('{0}-aks-{1}', deployment().name, variables('config').clusters[range(0, length(variables('config').clusters))[copyIndex('value')]].cluserName)), '2020-10-01').outputs.clusterId.value)]"
+              }
+            ]
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.14.85.62628",
+              "templateHash": "11328830909753713366"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "fleetName": {
+              "type": "string"
+            },
+            "fleetDnsPrefix": {
+              "type": "string"
+            },
+            "memberClusters": {
+              "type": "array"
+            },
+            "tags": {
+              "type": "object"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ContainerService/fleets",
+              "apiVersion": "2022-09-02-preview",
+              "name": "[parameters('fleetName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "hubProfile": {
+                  "dnsPrefix": "[parameters('fleetDnsPrefix')]"
+                }
+              },
+              "tags": "[parameters('tags')]"
+            },
+            {
+              "copy": {
+                "name": "fleetMembers",
+                "count": "[length(parameters('memberClusters'))]",
+                "mode": "serial",
+                "batchSize": 1
+              },
+              "type": "Microsoft.ContainerService/fleets/members",
+              "apiVersion": "2022-09-02-preview",
+              "name": "[format('{0}/{1}', parameters('fleetName'), parameters('memberClusters')[copyIndex()].name)]",
+              "properties": {
+                "clusterResourceId": "[parameters('memberClusters')[copyIndex()].id]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ContainerService/fleets', parameters('fleetName'))]"
+              ]
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "aks"
+      ]
+    }
+  ]
+}

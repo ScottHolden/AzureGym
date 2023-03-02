@@ -12,8 +12,9 @@ See the Links section below for further infomation on deploying workloads to Fle
 As noted above, deployment may take up to 30 minutes
 
 ## Features:
-- System & Workload (Tser) Node Pools on each AKS Cluster
+- System & Workload (User) Node Pools on each AKS Cluster
 - Single VNet, individual Node & Pod Subnets per Node Pool
+- Azure AD RBAC enabled on all Clusters
 - All member Cluster configuration is stored within `config.json`
 
 ## Architecture:

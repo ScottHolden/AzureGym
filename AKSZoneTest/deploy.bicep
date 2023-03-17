@@ -59,5 +59,6 @@ module kubeDeploy 'modules/kube.bicep' = {
     aksCluserName: aksCluster.outputs.aksCluserName
     containerImage: container.outputs.image
     replicas: podReplicas
+    hops: 4
   }
 }

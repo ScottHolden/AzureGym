@@ -2,7 +2,7 @@
 param kubeConfig string
 param containerImage string
 param replicas int
-//param hops int
+param hops int
 
 var namespaceName = 'zonetest'
 
@@ -17,22 +17,22 @@ resource namespace 'core/Namespace@v1' = {
   }
 }
 
-resource zonetestDeployment 'apps/Deployment@v1' = {
+resource zonetestDeployment 'apps/Deployment@v1' = [for index in range(0, hops): {
   dependsOn: [ namespace ]
   metadata: {
-    name: 'zone-test-fwd-0'
+    name: 'zone-test-fwd-${index}'
   }
   spec: {
     replicas: replicas
     selector: {
       matchLabels: {
-        app: 'zone-test-fwd-0'
+        app: 'zone-test-fwd-${index}'
       }
     }
     template: {
       metadata: {
         labels: {
-          app: 'zone-test-fwd-0'
+          app: 'zone-test-fwd-${index}'
         }
       }
       spec: {
@@ -41,21 +41,13 @@ resource zonetestDeployment 'apps/Deployment@v1' = {
         }
         containers: [
           {
-            name: 'zone-test-fwd-0'
+            name: 'zone-test-fwd'
             image: containerImage
             ports: [
               {
                 containerPort: 80
               }
             ]
-            resources: {
-              requests: {
-                cpu: '250m'
-              }
-              limits: {
-                cpu: '500m'
-              }
-            }
             env: [
               {
                 name: 'pod_name'
@@ -73,28 +65,32 @@ resource zonetestDeployment 'apps/Deployment@v1' = {
                   }
                 }
               }
+              {
+                name: 'next_hop'
+                value: index < hops - 1 ? 'http://zone-test-fwd-${index + 1}/' : ''
+              }
             ]
           }
         ]
       }
     }
   }
-}
+}]
 
-resource zonetestService 'core/Service@v1' = {
+resource zonetestService 'core/Service@v1' = [for index in range(0, hops): {
   dependsOn: [ namespace ]
   metadata: {
-    name: 'zone-test-fwd-0'
+    name: 'zone-test-fwd-${index}'
   }
   spec: {
-    type: 'LoadBalancer'
+    type: index == 0 ? 'LoadBalancer' : null
     ports: [
       {
         port: 80
       }
     ]
     selector: {
-      app: 'zone-test-fwd-0'
+      app: 'zone-test-fwd-${index}'
     }
   }
-}
+}]

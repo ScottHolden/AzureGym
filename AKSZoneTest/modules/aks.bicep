@@ -26,7 +26,7 @@ param workloadNodePool object = {
   nodeSubnetAddressPrefix: '10.197.64.0/23'
   podSubnetAddressPrefix: '10.197.68.0/22'
   vmCount: workloadNodes
-  vmSize: 'standard_d2s_v5'
+  vmSize: 'standard_d4s_v5'
 }
 
 var nodeSubnetFormat = 'aks-{0}-nodepool'

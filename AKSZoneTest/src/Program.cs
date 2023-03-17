@@ -17,6 +17,9 @@ string podDetails = $"""
 
 string? nextHop = Environment.GetEnvironmentVariable("next_hop");
 
+Console.WriteLine(podDetails);
+Console.WriteLine(string.IsNullOrWhiteSpace(nextHop) ? "No next hop" : $"Next hop: {nextHop}");
+
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 

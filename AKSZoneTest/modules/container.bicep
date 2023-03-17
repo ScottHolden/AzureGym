@@ -4,6 +4,7 @@ param imageName string
 param sourceRepo string
 param dockerFilePath string
 param pullPrincipalId string
+param imageTagSeed string = utcNow()
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-06-01-preview' = {
   name: registryName
@@ -24,7 +25,7 @@ resource buildTask 'Microsoft.ContainerRegistry/registries/taskRuns@2019-06-01-p
       type: 'DockerBuildRequest'
       dockerFilePath: dockerFilePath
       imageNames: [
-        imageName
+        '${imageName}:v1-${uniqueString(imageTagSeed)}'
       ]
       isPushEnabled: true
       sourceLocation: sourceRepo

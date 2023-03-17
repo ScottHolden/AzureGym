@@ -19,6 +19,9 @@ param dockerfilePath string = 'AKSZoneTest/src/Dockerfile'
 var uniqueNameFormat = '${prefix}-{0}-${uniqueString(resourceGroup().id, prefix)}'
 var uniqueShortName = toLower('${prefix}${uniqueString(resourceGroup().id, prefix)}')
 
+var workloadNodes = 6
+var podReplicas = workloadNodes * 2
+
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: format(uniqueNameFormat, 'workspace')
   location: location
@@ -33,6 +36,7 @@ module aksCluster 'modules/aks.bicep' = {
     aksDnsPrefix: uniqueShortName
     vnetName: format(uniqueNameFormat, 'vnet')
     logAnalyticsWorkspaceResourceID: logAnalytics.id
+    workloadNodes: workloadNodes
     tags: tags
   }
 }
@@ -41,7 +45,7 @@ module container 'modules/container.bicep' = {
   name: '${deployment().name}-container'
   params: {
     location: location
-    registryName: format(uniqueNameFormat, 'registry')
+    registryName: take('${uniqueShortName}registry', 50)
     imageName: 'hopworkload'
     sourceRepo: sourceRepo
     dockerFilePath: dockerfilePath
@@ -49,11 +53,11 @@ module container 'modules/container.bicep' = {
   }
 }
 
-module kubeDeploy 'modules/kube-deployment.bicep' = {
+module kubeDeploy 'modules/kube.bicep' = {
   name: '${deployment().name}-kube'
   params: {
     aksCluserName: aksCluster.outputs.aksCluserName
     containerImage: container.outputs.image
-    replicas: 6 * 2
+    replicas: podReplicas
   }
 }

@@ -1,23 +1,24 @@
-param aksCluserName string
+@secure()
+param kubeConfig string
 param containerImage string
 param replicas int
+//param hops int
 
-resource aksClusterRef 'Microsoft.ContainerService/managedClusters@2022-07-02-preview' existing = {
-  name: aksCluserName
-}
+var namespaceName = 'zonetest'
 
 import 'kubernetes@1.0.0' with {
-  namespace: namespace.metadata.name
-  kubeConfig: aksClusterRef.listClusterAdminCredential().kubeconfigs[0].value
+  namespace: namespaceName
+  kubeConfig: kubeConfig
 }
 
 resource namespace 'core/Namespace@v1' = {
   metadata: {
-    name: 'zonetest'
+    name: namespaceName
   }
 }
 
 resource zonetestDeployment 'apps/Deployment@v1' = {
+  dependsOn: [ namespace ]
   metadata: {
     name: 'zone-test-fwd-0'
   }
@@ -65,34 +66,10 @@ resource zonetestDeployment 'apps/Deployment@v1' = {
                 }
               }
               {
-                name: 'k8s_region'
-                valueFrom: {
-                  fieldRef: {
-                    fieldPath: 'metadata.labels[\'topology.kubernetes.io/region\']'
-                  }
-                }
-              }
-              {
-                name: 'k8s_zone'
-                valueFrom: {
-                  fieldRef: {
-                    fieldPath: 'metadata.labels[\'topology.kubernetes.io/zone\']'
-                  }
-                }
-              }
-              {
-                name: 'k8s_agentpool'
-                valueFrom: {
-                  fieldRef: {
-                    fieldPath: 'metadata.labels[\'kubernetes.azure.com/agentpool\']'
-                  }
-                }
-              }
-              {
                 name: 'k8s_hostname'
                 valueFrom: {
                   fieldRef: {
-                    fieldPath: 'metadata.labels[\'kubernetes.io/hostname\']'
+                    fieldPath: 'spec.nodeName'
                   }
                 }
               }
@@ -105,6 +82,7 @@ resource zonetestDeployment 'apps/Deployment@v1' = {
 }
 
 resource zonetestService 'core/Service@v1' = {
+  dependsOn: [ namespace ]
   metadata: {
     name: 'zone-test-fwd-0'
   }

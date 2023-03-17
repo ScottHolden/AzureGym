@@ -4,6 +4,7 @@ param tags object = {}
 param aksClusterName string
 param aksDnsPrefix string
 param vnetName string
+param workloadNodes int
 
 @description('The address space prefixes to use for the vnet. All subnets defined in the params should be contained within this.')
 param vnetAddressSpacePrefixes array = [
@@ -24,7 +25,7 @@ param workloadNodePool object = {
   name: 'shared'
   nodeSubnetAddressPrefix: '10.197.64.0/23'
   podSubnetAddressPrefix: '10.197.68.0/22'
-  vmCount: 6
+  vmCount: workloadNodes
   vmSize: 'standard_d2s_v5'
 }
 
@@ -99,10 +100,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2022-07-02-previ
         name: workloadNodePool.name
         mode: 'User'
         osType: 'Linux'
-        enableAutoScaling: true
-        count: 1
-        minCount: workloadNodePool.vmCountMin
-        maxCount: workloadNodePool.vmCountMax
+        count: workloadNodePool.vmCount
         vmSize: workloadNodePool.vmSize
         type: 'VirtualMachineScaleSets'
         availabilityZones: nodeZones

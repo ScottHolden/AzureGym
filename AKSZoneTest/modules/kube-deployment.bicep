@@ -3,12 +3,18 @@ param kubeConfig string
 param containerImage string
 param replicas int
 param hops int
+param topologyAware bool = false
+param namespaceName string
+param prefix string
 
-var namespaceName = 'zonetest'
 
 import 'kubernetes@1.0.0' with {
   namespace: namespaceName
   kubeConfig: kubeConfig
+}
+
+var topologyAwareAnnotations = {
+  'service.kubernetes.io/topology-aware-hints' : 'auto'
 }
 
 resource namespace 'core/Namespace@v1' = {
@@ -20,19 +26,19 @@ resource namespace 'core/Namespace@v1' = {
 resource zonetestDeployment 'apps/Deployment@v1' = [for index in range(0, hops): {
   dependsOn: [ namespace ]
   metadata: {
-    name: 'zone-test-fwd-${index}'
+    name: '${prefix}-fwd-${index}'
   }
   spec: {
     replicas: replicas
     selector: {
       matchLabels: {
-        app: 'zone-test-fwd-${index}'
+        app: '${prefix}-fwd-${index}'
       }
     }
     template: {
       metadata: {
         labels: {
-          app: 'zone-test-fwd-${index}'
+          app: '${prefix}-fwd-${index}'
         }
       }
       spec: {
@@ -41,7 +47,7 @@ resource zonetestDeployment 'apps/Deployment@v1' = [for index in range(0, hops):
         }
         containers: [
           {
-            name: 'zone-test-fwd'
+            name: '${prefix}-fwd'
             image: containerImage
             ports: [
               {
@@ -67,7 +73,7 @@ resource zonetestDeployment 'apps/Deployment@v1' = [for index in range(0, hops):
               }
               {
                 name: 'next_hop'
-                value: index < hops - 1 ? 'http://zone-test-fwd-${index + 1}/' : ''
+                value: index < hops - 1 ? 'http://${prefix}-fwd-${index + 1}/' : ''
               }
             ]
           }
@@ -80,7 +86,8 @@ resource zonetestDeployment 'apps/Deployment@v1' = [for index in range(0, hops):
 resource zonetestService 'core/Service@v1' = [for index in range(0, hops): {
   dependsOn: [ namespace ]
   metadata: {
-    name: 'zone-test-fwd-${index}'
+    name: '${prefix}-fwd-${index}'
+    annotations: topologyAware ? topologyAwareAnnotations : null
   }
   spec: {
     type: index == 0 ? 'LoadBalancer' : null
@@ -90,7 +97,7 @@ resource zonetestService 'core/Service@v1' = [for index in range(0, hops): {
       }
     ]
     selector: {
-      app: 'zone-test-fwd-${index}'
+      app: '${prefix}-fwd-${index}'
     }
   }
 }]

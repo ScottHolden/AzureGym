@@ -1,0 +1,82 @@
+<html>
+    <head>
+        <title>AKS Zone Test</title>
+        <style>
+            *, *::before, *::after {
+                box-sizing: border-box;
+            }
+            html, body {
+                background-color: #555;
+                margin: 0;
+                width: 100%;
+                min-height: 100vh;
+                scroll-behavior: smooth;
+                text-rendering: optimizeSpeed;
+                line-height: 1.5;
+            }
+            html, body, pre, h1, span {
+                text-align: center;
+                font-family: monospace;
+            }
+            button {
+                margin: 0 10px;
+            }
+            .container {
+                margin: auto;
+                max-width: 1000px;
+                background-color: #DDD;
+                padding: 15px;
+                min-height: 100%;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>AKS Zone Test</h1>
+            <button id="btn-start">Start</button><button id="btn-pause" disabled>Pause</button>
+            <div id="result-graph">
+                <pre>
+                    [Svc 1]
+                    Zone 1-2-3
+                    NodePool
+                    Node
+                        Pod
+                </pre>
+            </div>
+        </div>
+        <script>
+            (()=>{
+                const startButton = document.getElementById("btn-start");
+                const pauseButton = document.getElementById("btn-pause");
+                var running = false;
+                const callApi = () => new Promise((resolve, reject) => {
+                    if (Math.random() < 1.01) {
+                        console.log("hit");
+                        resolve();
+                    } else {
+                        reject(new Error());
+                    }});
+                const loop = () => callApi().then(x => running ? loop() : x);
+                startButton.addEventListener("click", ()=>{
+                    startButton.disabled = true;
+                    pauseButton.disabled = false;
+                    if (running) return;
+                    running = true;
+                    loop().catch(x => console.log(x)).finally(x => {
+                        pauseButton.disabled = true;
+                        startButton.disabled = false;
+                    });
+                });
+                pauseButton.addEventListener("click", ()=>{
+                    pauseButton.disabled = true;
+                    running = false;
+                });
+                
+
+            })();
+            /*fetch("/json")
+                .then(x => x.json())
+                .then(y => console.log(y));*/
+        </script>
+    </body>
+</html>

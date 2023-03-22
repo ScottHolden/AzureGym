@@ -5,7 +5,7 @@ using System.Net.Http.Json;
 string podName = Environment.GetEnvironmentVariable("pod_name") ?? "unknown"; // metadata.name
 string hostname = Environment.GetEnvironmentVariable("k8s_hostname") ?? "unknown"; // spec.nodeName
 
-// Read these values from IMDS (Not supported when pod ideneity is used)
+// Read these values from IMDS (Not supported when pod identity is used)
 IMDSResponse imdsDetails = await IMDSResponse.GetAsync();
 string podDetails = $"""
     Pod Name: {podName}
@@ -61,6 +61,47 @@ app.MapGet("/", async () => {
     }
     return sb.ToString();
 });
+
+app.MapGet("/json", async () => {
+    object nextHopResult = new {
+        status = "last"
+    };
+
+    if (!string.IsNullOrWhiteSpace(nextHop))
+    {
+        try
+        {
+            // Not a best practice at all, but force a new client each request
+            using var hc = new HttpClient();
+            var sw = Stopwatch.StartNew();
+            var resp = await hc.GetFromJsonAsync<object>(new Uri(new Uri(nextHop), "/json"));
+            sw.Stop();
+            nextHopResult = new {
+                status = "ok",
+                rtt = sw.ElapsedMilliseconds,
+                result = resp
+            };
+        }
+        catch (Exception e)
+        {
+            nextHopResult = new {
+                status = "error",
+                error = e.Message
+            };
+        }
+    }
+
+    return new {
+        podName = podName,
+        region = imdsDetails.location,
+        zone = imdsDetails.zone,
+        agentPool = imdsDetails.vmScaleSetName,
+        nodeHostname = hostname,
+        nextHop = nextHopResult
+    };
+});
+
+app.MapGet("/ui", () => Results.Extensions.EmbeddedResourceHtml<IMDSResponse>("ui.html"));
 
 app.MapGet("/health", () => "ok");
 

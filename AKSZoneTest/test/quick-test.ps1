@@ -1,11 +1,18 @@
-$url = "http://<put the service external url here>/"
-$runTime = [timespan]::FromMinutes(2)
+param(
+    [string]$url,
+    [int]$runTime = 2
+)
+
+if (!$url.StartsWith("http",  [StringComparison]::OrdinalIgnoreCase)) {
+    $url = "http://$url"
+}
+$runTimeSpan = [timespan]::FromMinutes($runTime)
 
 # Make sure to check that it is showing zones and not "Unknown" before running
 $stats = @{}
 $count = 0
-$endTime = [datetime]::Now + $runTime
-Write-Host "Running till $endTime ($runTime)"
+$endTime = [datetime]::Now + $runTimeSpan
+Write-Host "Running till $endTime ($runTimeSpan)"
 $ProgressPreference = 'SilentlyContinue'
 while ([datetime]::Now -lt $endTime) {
     $res = Invoke-WebRequest -UseBasicParsing -Uri $url
@@ -18,7 +25,7 @@ while ([datetime]::Now -lt $endTime) {
     Write-Host "$azHops hops ($([string]::Join(" => ", $zones))) in $($allupLatency)ms"
 }
 
-Write-Host "Final Stats ($runTime run, $count requests):"
+Write-Host "Final Stats ($runTimeSpan run, $count requests):"
 $stats.Keys | Sort-Object | ForEach-Object {
     $measure = $stats[$_] | Measure-Object -Average -Minimum -Maximum
     return [pscustomobject]@{

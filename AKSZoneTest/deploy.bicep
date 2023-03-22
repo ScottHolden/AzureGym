@@ -20,7 +20,7 @@ var uniqueNameFormat = '${prefix}-{0}-${uniqueString(resourceGroup().id, prefix)
 var uniqueShortName = toLower('${prefix}${uniqueString(resourceGroup().id, prefix)}')
 
 var workloadNodes = 6
-var podReplicas = workloadNodes * 2
+var podReplicas = workloadNodes * 1
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: format(uniqueNameFormat, 'workspace')
@@ -60,5 +60,7 @@ module kubeDeploy 'modules/kube.bicep' = {
     containerImage: container.outputs.image
     replicas: podReplicas
     hops: 4
+    deployStandard: true
+    deployTopologyAware: true
   }
 }

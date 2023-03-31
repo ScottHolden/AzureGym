@@ -80,6 +80,22 @@ resource cluster 'Microsoft.ContainerService/managedClusters@2022-11-02-preview'
   }
 }
 
+// A bit of overkill but fine for demo, AKS needs permission to join LB to Subnet
+resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
+  scope: subscription()
+  name: 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
+}
+
+resource containerPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = {
+  name: guid(vnet::nodeSubnet.id, cluster.id, contributorRoleDefinition.id)
+  scope: vnet::nodeSubnet
+  properties: {
+    principalId: cluster.properties.identityProfile.kubeletidentity.objectId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: contributorRoleDefinition.id
+  }
+}
+
 output vnetName string = vnet.name
 output vnetId string = vnet.id
 output clusterName string = cluster.name

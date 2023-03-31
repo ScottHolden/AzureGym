@@ -7,7 +7,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.15.31.15270",
-      "templateHash": "7130811596698906425"
+      "templateHash": "5237225183815646297"
     }
   },
   "parameters": {
@@ -150,7 +150,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "2037037579488959273"
+              "templateHash": "10593488571335277272"
             }
           },
           "parameters": {
@@ -275,6 +275,28 @@
                 "type": "SystemAssigned"
               },
               "dependsOn": [
+                "vnet"
+              ]
+            },
+            "contributorRoleDefinition": {
+              "existing": true,
+              "type": "Microsoft.Authorization/roleDefinitions",
+              "apiVersion": "2018-01-01-preview",
+              "subscriptionId": "[subscription().subscriptionId]",
+              "name": "b24988ac-6180-42a0-ab88-20f7382dd24c"
+            },
+            "containerPullRoleAssignment": {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2020-10-01-preview",
+              "scope": "[format('Microsoft.Network/virtualNetworks/{0}/subnets/{1}', parameters('vnetName'), parameters('nodeSubnetName'))]",
+              "name": "[guid(resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('nodeSubnetName')), resourceId('Microsoft.ContainerService/managedClusters', parameters('clusterName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c'))]",
+              "properties": {
+                "principalId": "[reference('cluster').identityProfile.kubeletidentity.objectId]",
+                "principalType": "ServicePrincipal",
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]"
+              },
+              "dependsOn": [
+                "cluster",
                 "vnet"
               ]
             }
@@ -356,7 +378,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "2037037579488959273"
+              "templateHash": "10593488571335277272"
             }
           },
           "parameters": {
@@ -481,6 +503,28 @@
                 "type": "SystemAssigned"
               },
               "dependsOn": [
+                "vnet"
+              ]
+            },
+            "contributorRoleDefinition": {
+              "existing": true,
+              "type": "Microsoft.Authorization/roleDefinitions",
+              "apiVersion": "2018-01-01-preview",
+              "subscriptionId": "[subscription().subscriptionId]",
+              "name": "b24988ac-6180-42a0-ab88-20f7382dd24c"
+            },
+            "containerPullRoleAssignment": {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2020-10-01-preview",
+              "scope": "[format('Microsoft.Network/virtualNetworks/{0}/subnets/{1}', parameters('vnetName'), parameters('nodeSubnetName'))]",
+              "name": "[guid(resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('nodeSubnetName')), resourceId('Microsoft.ContainerService/managedClusters', parameters('clusterName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c'))]",
+              "properties": {
+                "principalId": "[reference('cluster').identityProfile.kubeletidentity.objectId]",
+                "principalType": "ServicePrincipal",
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]"
+              },
+              "dependsOn": [
+                "cluster",
                 "vnet"
               ]
             }
@@ -823,7 +867,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "14576006467931476451"
+              "templateHash": "9767449333519416329"
             }
           },
           "parameters": {
@@ -888,7 +932,7 @@
                     "_generator": {
                       "name": "bicep",
                       "version": "0.15.31.15270",
-                      "templateHash": "3161436041817739734"
+                      "templateHash": "5944572426434625217"
                     }
                   },
                   "parameters": {
@@ -1019,7 +1063,7 @@
                         "namespace"
                       ]
                     },
-                    "zonetestService": {
+                    "zonetestServiceInternal": {
                       "import": "kubernetes",
                       "type": "core/Service@v1",
                       "properties": {
@@ -1031,6 +1075,29 @@
                         },
                         "spec": {
                           "type": "LoadBalancer",
+                          "ports": [
+                            {
+                              "port": 80
+                            }
+                          ],
+                          "selector": {
+                            "app": "[parameters('workloadName')]"
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "namespace"
+                      ]
+                    },
+                    "zonetestServiceNodeId": {
+                      "import": "kubernetes",
+                      "type": "core/Service@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[format('{0}-nodeport', parameters('workloadName'))]"
+                        },
+                        "spec": {
+                          "type": "NodePort",
                           "ports": [
                             {
                               "port": 80
@@ -1093,7 +1160,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "14576006467931476451"
+              "templateHash": "9767449333519416329"
             }
           },
           "parameters": {
@@ -1158,7 +1225,7 @@
                     "_generator": {
                       "name": "bicep",
                       "version": "0.15.31.15270",
-                      "templateHash": "3161436041817739734"
+                      "templateHash": "5944572426434625217"
                     }
                   },
                   "parameters": {
@@ -1289,7 +1356,7 @@
                         "namespace"
                       ]
                     },
-                    "zonetestService": {
+                    "zonetestServiceInternal": {
                       "import": "kubernetes",
                       "type": "core/Service@v1",
                       "properties": {
@@ -1301,6 +1368,29 @@
                         },
                         "spec": {
                           "type": "LoadBalancer",
+                          "ports": [
+                            {
+                              "port": 80
+                            }
+                          ],
+                          "selector": {
+                            "app": "[parameters('workloadName')]"
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "namespace"
+                      ]
+                    },
+                    "zonetestServiceNodeId": {
+                      "import": "kubernetes",
+                      "type": "core/Service@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[format('{0}-nodeport', parameters('workloadName'))]"
+                        },
+                        "spec": {
+                          "type": "NodePort",
                           "ports": [
                             {
                               "port": 80

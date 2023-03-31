@@ -95,7 +95,7 @@ resource zonetestServiceExternal 'core/Service@v1' = {
   }
 }
 
-resource zonetestService 'core/Service@v1' = {
+resource zonetestServiceInternal 'core/Service@v1' = {
   dependsOn: [ namespace ]
   metadata: {
     name: '${workloadName}-internal'
@@ -105,6 +105,24 @@ resource zonetestService 'core/Service@v1' = {
   }
   spec: {
     type: 'LoadBalancer'
+    ports: [
+      {
+        port: 80
+      }
+    ]
+    selector: {
+      app: workloadName
+    }
+  }
+}
+
+resource zonetestServiceNodeId 'core/Service@v1' = {
+  dependsOn: [ namespace ]
+  metadata: {
+    name: '${workloadName}-nodeport'
+  }
+  spec: {
+    type: 'NodePort'
     ports: [
       {
         port: 80

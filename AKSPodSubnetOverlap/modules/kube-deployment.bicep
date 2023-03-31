@@ -5,6 +5,9 @@ param replicas int
 param namespaceName string
 param workloadName string
 param clusterName string
+param clusterId string
+
+var plsName = 'pls-${guid(clusterId, namespaceName, workloadName)}'
 
 import 'kubernetes@1.0.0' with {
   namespace: namespaceName
@@ -101,6 +104,8 @@ resource zonetestServiceInternal 'core/Service@v1' = {
     name: '${workloadName}-internal'
     annotations: {
       'service.beta.kubernetes.io/azure-load-balancer-internal': 'true'
+      'service.beta.kubernetes.io/azure-pls-create': 'true'
+      'service.beta.kubernetes.io/azure-pls-name': plsName
     }
   }
   spec: {
@@ -133,3 +138,6 @@ resource zonetestServiceNodeId 'core/Service@v1' = {
     }
   }
 }
+
+output internalServiceName string = zonetestServiceInternal.metadata.name
+output privateLinkServiceName string = plsName

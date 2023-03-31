@@ -17,5 +17,9 @@ module kubeApply 'kube-deployment.bicep' = {
     namespaceName: namespaceName
     workloadName: workloadName
     clusterName: aksClusterRef.name
+    clusterId: aksClusterRef.id
   }
 }
+
+output privateLinkServiceId string = resourceId(subscription().subscriptionId, aksClusterRef.properties.nodeResourceGroup, 'Microsoft.Network/privateLinkServices', kubeApply.outputs.privateLinkServiceName) 
+output nodeResourceGroup string = aksClusterRef.properties.nodeResourceGroup

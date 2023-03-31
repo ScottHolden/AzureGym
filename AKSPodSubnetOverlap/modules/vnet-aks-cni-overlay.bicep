@@ -25,6 +25,8 @@ resource vnet 'Microsoft.Network/virtualNetworks@2022-05-01' = {
         name: nodeSubnetName
         properties: {
           addressPrefix: nodeSubnetPrefix
+          privateEndpointNetworkPolicies: 'Enabled'
+          privateLinkServiceNetworkPolicies: 'Enabled'
         }
     }]
   }
@@ -98,5 +100,6 @@ resource containerPullRoleAssignment 'Microsoft.Authorization/roleAssignments@20
 
 output vnetName string = vnet.name
 output vnetId string = vnet.id
+output nodeSubnetId string = vnet::nodeSubnet.id
 output clusterName string = cluster.name
 output kubeletIdentityObjectId string = cluster.properties.identityProfile.kubeletidentity.objectId

@@ -126,3 +126,17 @@ module kubeApplyCluster1 'modules/kube-apply.bicep' = {
   }
   dependsOn: [ containerPullPermission ]
 }
+
+module privateEndpoint 'modules/private-endpoint.bicep' = {
+  name: '${deployment().name}-pe'
+  dependsOn: [ kubeApplyCluster1, vnetPeering ]
+  params: {
+    location: location
+    subnetId: cluster1.outputs.nodeSubnetId
+    endpointName: format(uniqueNameFormat, 'cluster1-endpoint')
+    endpointNicName: format(uniqueNameFormat, 'cluster1-endpoint-nic')
+    privateLinkServiceId: kubeApplyCluster1.outputs.privateLinkServiceId
+    nodeResourceGroup: kubeApplyCluster1.outputs.nodeResourceGroup
+    tags: tags
+  }
+}

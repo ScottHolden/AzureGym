@@ -16,5 +16,6 @@ module kubeApply 'kube-deployment.bicep' = {
     replicas: replicas
     namespaceName: namespaceName
     workloadName: workloadName
+    clusterName: aksClusterRef.name
   }
 }

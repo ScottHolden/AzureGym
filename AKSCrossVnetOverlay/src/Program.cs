@@ -1,5 +1,6 @@
 using System.Text;
 
+string cluster = Environment.GetEnvironmentVariable("cluster_name") ?? "unknown"; // metadata.name
 string podName = Environment.GetEnvironmentVariable("pod_name") ?? "unknown"; // metadata.name
 string hostName = Environment.GetEnvironmentVariable("k8s_hostname") ?? "unknown"; // spec.nodeName
 
@@ -11,7 +12,7 @@ app.MapGet("/", () => Results.Text($@"
 <html lang='en'><head>
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>{podName} - PathTest</title><style>
+<title>{podName} - PathTest [{cluster}]</title><style>
 html, body {{
     margin: 0;
     padding: 0;
@@ -33,7 +34,7 @@ pre {{
 }}
 </style></head><body><div class='container'>
     <h1>Path Test</h1>
-    <h2>{podName} on {hostName}</h2>
+    <h2>{podName} on {hostName}<br />[{cluster}]</h2>
     <div><a href='/ping'>Text Endpoint</a> | <a href='/json'>Json Endpoint</a><br></div>
     <div><label>Url to GET (via pod): <input type='text' id='targetUrl' /></label><button type='button' id='callButton'>Call</button></div>
     <div><pre id='response'>
@@ -52,6 +53,8 @@ pre {{
             }};
             document.getElementById('callButton').addEventListener('click', fx);
             document.getElementById('targetUrl').addEventListener('keypress', x => {{if(x.keyCode==13) fx();}});
+            const ps = (new URLSearchParams(window.location.search)).get('prefill');
+            if (ps) document.getElementById('targetUrl').value = decodeURIComponent(ps);
         }})();
     </script>
 </body></html>
@@ -73,11 +76,12 @@ app.MapPost("/call", async (CallRequest call) =>
         return Results.Text("Error: " + e.Message, "text/plain", Encoding.UTF8);
     }
 });
-app.MapGet("/ping", () => $"Hello from {podName} on {hostName}");
+app.MapGet("/ping", () => $"Hello from {podName} on {hostName} [{cluster}]");
 app.MapGet("/json", () => new
 {
     podName = podName,
-    hostName = hostName
+    hostName = hostName,
+    cluster = cluster
 });
 
 app.Run();

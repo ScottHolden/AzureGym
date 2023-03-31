@@ -4,6 +4,7 @@ param containerImage string
 param replicas int
 param namespaceName string
 param workloadName string
+param clusterName string
 
 import 'kubernetes@1.0.0' with {
   namespace: namespaceName
@@ -63,6 +64,10 @@ resource zonetestDeployment 'apps/Deployment@v1' = {
                     fieldPath: 'spec.nodeName'
                   }
                 }
+              }
+              {
+                name: 'cluster_name'
+                value: clusterName
               }
             ]
           }

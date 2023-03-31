@@ -7,7 +7,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.15.31.15270",
-      "templateHash": "12518353841351287816"
+      "templateHash": "9513463504965970476"
     }
   },
   "parameters": {
@@ -34,7 +34,7 @@
     },
     "dockerFilePath": {
       "type": "string",
-      "defaultValue": "AKSCrossVnetOcerlay/src/Dockerfile",
+      "defaultValue": "AKSCrossVnetOverlay/src/Dockerfile",
       "metadata": {
         "description": "Dockerfile path in Source Repo"
       }

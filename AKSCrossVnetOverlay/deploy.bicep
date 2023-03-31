@@ -8,7 +8,7 @@ param prefix string = 'akscvo'
 param sourceRepo string = 'https://github.com/ScottHolden/AzureGym.git'
 
 @description('Dockerfile path in Source Repo')
-param dockerFilePath string = 'AKSCrossVnetOcerlay/src/Dockerfile'
+param dockerFilePath string = 'AKSCrossVnetOverlay/src/Dockerfile'
 
 @description('Nodes per cluster')
 param perClusterNodeCount int = 3

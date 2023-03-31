@@ -1,0 +1,91 @@
+@secure()
+param kubeConfig string
+param containerImage string
+param replicas int
+param namespaceName string
+param workloadName string
+
+import 'kubernetes@1.0.0' with {
+  namespace: namespaceName
+  kubeConfig: kubeConfig
+}
+
+resource namespace 'core/Namespace@v1' = {
+  metadata: {
+    name: namespaceName
+  }
+}
+
+resource zonetestDeployment 'apps/Deployment@v1' = {
+  dependsOn: [ namespace ]
+  metadata: {
+    name: workloadName
+  }
+  spec: {
+    replicas: replicas
+    selector: {
+      matchLabels: {
+        app: workloadName
+      }
+    }
+    template: {
+      metadata: {
+        labels: {
+          app: workloadName
+        }
+      }
+      spec: {
+        nodeSelector: {
+          'beta.kubernetes.io/os': 'linux'
+        }
+        containers: [
+          {
+            name: workloadName
+            image: containerImage
+            ports: [
+              {
+                containerPort: 80
+              }
+            ]
+            env: [
+              {
+                name: 'pod_name'
+                valueFrom: {
+                  fieldRef: {
+                    fieldPath: 'metadata.name'
+                  }
+                }
+              }
+              {
+                name: 'k8s_hostname'
+                valueFrom: {
+                  fieldRef: {
+                    fieldPath: 'spec.nodeName'
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
+
+resource zonetestService 'core/Service@v1' = {
+  dependsOn: [ namespace ]
+  metadata: {
+    name: workloadName
+  }
+  spec: {
+    type: 'LoadBalancer'
+    ports: [
+      {
+        port: 80
+      }
+    ]
+    selector: {
+      app: workloadName
+    }
+  }
+}

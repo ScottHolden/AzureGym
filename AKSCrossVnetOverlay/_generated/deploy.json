@@ -1,0 +1,1214 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "1.10-experimental",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+    "_generator": {
+      "name": "bicep",
+      "version": "0.15.31.15270",
+      "templateHash": "12518353841351287816"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "The location all resources will be deployed to"
+      }
+    },
+    "prefix": {
+      "type": "string",
+      "defaultValue": "akscvo",
+      "metadata": {
+        "description": "A prefix to add to the start of all resource names. Note: A \"unique\" suffix will also be added"
+      }
+    },
+    "sourceRepo": {
+      "type": "string",
+      "defaultValue": "https://github.com/ScottHolden/AzureGym.git",
+      "metadata": {
+        "description": "Source Repo for Dockerfile"
+      }
+    },
+    "dockerFilePath": {
+      "type": "string",
+      "defaultValue": "AKSCrossVnetOcerlay/src/Dockerfile",
+      "metadata": {
+        "description": "Dockerfile path in Source Repo"
+      }
+    },
+    "perClusterNodeCount": {
+      "type": "int",
+      "defaultValue": 3,
+      "metadata": {
+        "description": "Nodes per cluster"
+      }
+    },
+    "nodeSize": {
+      "type": "string",
+      "defaultValue": "standard_d4s_v5",
+      "metadata": {
+        "description": "Nodes VM size"
+      }
+    },
+    "networkConfig": {
+      "type": "object",
+      "defaultValue": {
+        "cluster1": {
+          "addressSpace": "10.1.0.0/22",
+          "nodeSubnetCidr": "10.1.1.0/24",
+          "podOverlayCidr": "10.250.0.0/16"
+        },
+        "cluster2": {
+          "addressSpace": "10.2.0.0/22",
+          "nodeSubnetCidr": "10.2.1.0/24",
+          "podOverlayCidr": "10.250.0.0/16"
+        }
+      },
+      "metadata": {
+        "description": "Network configuration"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "Demo-Name": "AKSCrossVnetOverlay",
+        "Demo-Repo": "https://github.com/ScottHolden/AzureGym/AKSCrossVnetOverlay"
+      },
+      "metadata": {
+        "description": "Tags to be applied to all deployed resources"
+      }
+    }
+  },
+  "variables": {
+    "uniqueNameFormat": "[format('{0}-{{0}}-{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix')))]",
+    "uniqueShortNameFormat": "[toLower(format('{0}{{0}}{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix'))))]",
+    "podReplicas": "[parameters('perClusterNodeCount')]",
+    "namespaceName": "test-app",
+    "workloadName": "pathtester"
+  },
+  "resources": {
+    "logAnalytics": {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[format(variables('uniqueNameFormat'), 'workspace')]",
+      "location": "[parameters('location')]",
+      "properties": {}
+    },
+    "cluster1": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-cluster1', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "vnetName": {
+            "value": "[format(variables('uniqueNameFormat'), 'cluster1-vnet')]"
+          },
+          "vnetaddressPrefix": {
+            "value": "[parameters('networkConfig').cluster1.addressSpace]"
+          },
+          "nodeSubnetPrefix": {
+            "value": "[parameters('networkConfig').cluster1.nodeSubnetCidr]"
+          },
+          "clusterName": {
+            "value": "[format(variables('uniqueNameFormat'), 'cluster1')]"
+          },
+          "clusterDnsPrefix": {
+            "value": "[format(variables('uniqueShortNameFormat'), 'c1')]"
+          },
+          "nodeCount": {
+            "value": "[parameters('perClusterNodeCount')]"
+          },
+          "nodeSize": {
+            "value": "[parameters('nodeSize')]"
+          },
+          "podCidr": {
+            "value": "[parameters('networkConfig').cluster1.podOverlayCidr]"
+          },
+          "logAnalyticsWorkspaceResourceID": {
+            "value": "[resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'workspace'))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.10-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "0.15.31.15270",
+              "templateHash": "2037037579488959273"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "vnetName": {
+              "type": "string"
+            },
+            "vnetaddressPrefix": {
+              "type": "string"
+            },
+            "nodeSubnetPrefix": {
+              "type": "string"
+            },
+            "nodeSubnetName": {
+              "type": "string",
+              "defaultValue": "node-subnet"
+            },
+            "clusterName": {
+              "type": "string"
+            },
+            "clusterDnsPrefix": {
+              "type": "string"
+            },
+            "nodeCount": {
+              "type": "int"
+            },
+            "nodeSize": {
+              "type": "string"
+            },
+            "podCidr": {
+              "type": "string"
+            },
+            "logAnalyticsWorkspaceResourceID": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object"
+            }
+          },
+          "variables": {
+            "nodeZones": "[pickZones('Microsoft.Compute', 'virtualMachines', parameters('location'), 3)]"
+          },
+          "resources": {
+            "vnet::nodeSubnet": {
+              "existing": true,
+              "type": "Microsoft.Network/virtualNetworks/subnets",
+              "apiVersion": "2022-09-01",
+              "name": "[format('{0}/{1}', parameters('vnetName'), parameters('nodeSubnetName'))]",
+              "dependsOn": [
+                "vnet"
+              ]
+            },
+            "vnet": {
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2022-05-01",
+              "name": "[parameters('vnetName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "addressSpace": {
+                  "addressPrefixes": [
+                    "[parameters('vnetaddressPrefix')]"
+                  ]
+                },
+                "subnets": [
+                  {
+                    "name": "[parameters('nodeSubnetName')]",
+                    "properties": {
+                      "addressPrefix": "[parameters('nodeSubnetPrefix')]"
+                    }
+                  }
+                ]
+              }
+            },
+            "cluster": {
+              "type": "Microsoft.ContainerService/managedClusters",
+              "apiVersion": "2022-11-02-preview",
+              "name": "[parameters('clusterName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Basic",
+                "tier": "Paid"
+              },
+              "properties": {
+                "dnsPrefix": "[parameters('clusterDnsPrefix')]",
+                "networkProfile": {
+                  "networkPlugin": "azure",
+                  "networkPolicy": "azure",
+                  "loadBalancerSku": "standard",
+                  "networkPluginMode": "Overlay",
+                  "podCidr": "[parameters('podCidr')]"
+                },
+                "agentPoolProfiles": [
+                  {
+                    "name": "primary",
+                    "mode": "System",
+                    "osType": "Linux",
+                    "count": "[parameters('nodeCount')]",
+                    "vmSize": "[parameters('nodeSize')]",
+                    "type": "VirtualMachineScaleSets",
+                    "availabilityZones": "[variables('nodeZones')]",
+                    "vnetSubnetID": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('nodeSubnetName'))]"
+                  }
+                ],
+                "aadProfile": {
+                  "enableAzureRBAC": true,
+                  "managed": true
+                },
+                "addonProfiles": {
+                  "omsagent": {
+                    "enabled": true,
+                    "config": {
+                      "logAnalyticsWorkspaceResourceID": "[parameters('logAnalyticsWorkspaceResourceID')]"
+                    }
+                  }
+                }
+              },
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "dependsOn": [
+                "vnet"
+              ]
+            }
+          },
+          "outputs": {
+            "vnetName": {
+              "type": "string",
+              "value": "[parameters('vnetName')]"
+            },
+            "vnetId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+            },
+            "clusterName": {
+              "type": "string",
+              "value": "[parameters('clusterName')]"
+            },
+            "kubeletIdentityObjectId": {
+              "type": "string",
+              "value": "[reference('cluster').identityProfile.kubeletidentity.objectId]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "logAnalytics"
+      ]
+    },
+    "cluster2": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-cluster2', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "vnetName": {
+            "value": "[format(variables('uniqueNameFormat'), 'cluster2-vnet')]"
+          },
+          "vnetaddressPrefix": {
+            "value": "[parameters('networkConfig').cluster2.addressSpace]"
+          },
+          "nodeSubnetPrefix": {
+            "value": "[parameters('networkConfig').cluster2.nodeSubnetCidr]"
+          },
+          "clusterName": {
+            "value": "[format(variables('uniqueNameFormat'), 'cluster2')]"
+          },
+          "clusterDnsPrefix": {
+            "value": "[format(variables('uniqueShortNameFormat'), 'c2')]"
+          },
+          "nodeCount": {
+            "value": "[parameters('perClusterNodeCount')]"
+          },
+          "nodeSize": {
+            "value": "[parameters('nodeSize')]"
+          },
+          "podCidr": {
+            "value": "[parameters('networkConfig').cluster2.podOverlayCidr]"
+          },
+          "logAnalyticsWorkspaceResourceID": {
+            "value": "[resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'workspace'))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.10-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "0.15.31.15270",
+              "templateHash": "2037037579488959273"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "vnetName": {
+              "type": "string"
+            },
+            "vnetaddressPrefix": {
+              "type": "string"
+            },
+            "nodeSubnetPrefix": {
+              "type": "string"
+            },
+            "nodeSubnetName": {
+              "type": "string",
+              "defaultValue": "node-subnet"
+            },
+            "clusterName": {
+              "type": "string"
+            },
+            "clusterDnsPrefix": {
+              "type": "string"
+            },
+            "nodeCount": {
+              "type": "int"
+            },
+            "nodeSize": {
+              "type": "string"
+            },
+            "podCidr": {
+              "type": "string"
+            },
+            "logAnalyticsWorkspaceResourceID": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object"
+            }
+          },
+          "variables": {
+            "nodeZones": "[pickZones('Microsoft.Compute', 'virtualMachines', parameters('location'), 3)]"
+          },
+          "resources": {
+            "vnet::nodeSubnet": {
+              "existing": true,
+              "type": "Microsoft.Network/virtualNetworks/subnets",
+              "apiVersion": "2022-09-01",
+              "name": "[format('{0}/{1}', parameters('vnetName'), parameters('nodeSubnetName'))]",
+              "dependsOn": [
+                "vnet"
+              ]
+            },
+            "vnet": {
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2022-05-01",
+              "name": "[parameters('vnetName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "addressSpace": {
+                  "addressPrefixes": [
+                    "[parameters('vnetaddressPrefix')]"
+                  ]
+                },
+                "subnets": [
+                  {
+                    "name": "[parameters('nodeSubnetName')]",
+                    "properties": {
+                      "addressPrefix": "[parameters('nodeSubnetPrefix')]"
+                    }
+                  }
+                ]
+              }
+            },
+            "cluster": {
+              "type": "Microsoft.ContainerService/managedClusters",
+              "apiVersion": "2022-11-02-preview",
+              "name": "[parameters('clusterName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Basic",
+                "tier": "Paid"
+              },
+              "properties": {
+                "dnsPrefix": "[parameters('clusterDnsPrefix')]",
+                "networkProfile": {
+                  "networkPlugin": "azure",
+                  "networkPolicy": "azure",
+                  "loadBalancerSku": "standard",
+                  "networkPluginMode": "Overlay",
+                  "podCidr": "[parameters('podCidr')]"
+                },
+                "agentPoolProfiles": [
+                  {
+                    "name": "primary",
+                    "mode": "System",
+                    "osType": "Linux",
+                    "count": "[parameters('nodeCount')]",
+                    "vmSize": "[parameters('nodeSize')]",
+                    "type": "VirtualMachineScaleSets",
+                    "availabilityZones": "[variables('nodeZones')]",
+                    "vnetSubnetID": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('nodeSubnetName'))]"
+                  }
+                ],
+                "aadProfile": {
+                  "enableAzureRBAC": true,
+                  "managed": true
+                },
+                "addonProfiles": {
+                  "omsagent": {
+                    "enabled": true,
+                    "config": {
+                      "logAnalyticsWorkspaceResourceID": "[parameters('logAnalyticsWorkspaceResourceID')]"
+                    }
+                  }
+                }
+              },
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "dependsOn": [
+                "vnet"
+              ]
+            }
+          },
+          "outputs": {
+            "vnetName": {
+              "type": "string",
+              "value": "[parameters('vnetName')]"
+            },
+            "vnetId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+            },
+            "clusterName": {
+              "type": "string",
+              "value": "[parameters('clusterName')]"
+            },
+            "kubeletIdentityObjectId": {
+              "type": "string",
+              "value": "[reference('cluster').identityProfile.kubeletidentity.objectId]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "logAnalytics"
+      ]
+    },
+    "vnetPeering": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-peering', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "vnet1name": {
+            "value": "[reference('cluster1').outputs.vnetName.value]"
+          },
+          "vnet2name": {
+            "value": "[reference('cluster2').outputs.vnetName.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.10-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "0.15.31.15270",
+              "templateHash": "8218773427379419036"
+            }
+          },
+          "parameters": {
+            "vnet1name": {
+              "type": "string"
+            },
+            "vnet2name": {
+              "type": "string"
+            }
+          },
+          "resources": {
+            "vnet1::peering": {
+              "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+              "apiVersion": "2022-09-01",
+              "name": "[format('{0}/{1}', parameters('vnet1name'), format('peering-to-{0}', parameters('vnet2name')))]",
+              "properties": {
+                "allowVirtualNetworkAccess": true,
+                "allowForwardedTraffic": true,
+                "allowGatewayTransit": false,
+                "useRemoteGateways": false,
+                "remoteVirtualNetwork": {
+                  "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnet2name'))]"
+                }
+              }
+            },
+            "vnet2::peering": {
+              "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+              "apiVersion": "2022-09-01",
+              "name": "[format('{0}/{1}', parameters('vnet2name'), format('peering-to-{0}', parameters('vnet1name')))]",
+              "properties": {
+                "allowVirtualNetworkAccess": true,
+                "allowForwardedTraffic": true,
+                "allowGatewayTransit": false,
+                "useRemoteGateways": false,
+                "remoteVirtualNetwork": {
+                  "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnet1name'))]"
+                }
+              }
+            },
+            "vnet1": {
+              "existing": true,
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2022-09-01",
+              "name": "[parameters('vnet1name')]"
+            },
+            "vnet2": {
+              "existing": true,
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2022-09-01",
+              "name": "[parameters('vnet2name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "cluster1",
+        "cluster2"
+      ]
+    },
+    "containerImage": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-conatiner', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "registryName": {
+            "value": "[format(variables('uniqueShortNameFormat'), 'acr')]"
+          },
+          "imageName": {
+            "value": "[variables('workloadName')]"
+          },
+          "sourceRepo": {
+            "value": "[parameters('sourceRepo')]"
+          },
+          "dockerFilePath": {
+            "value": "[parameters('dockerFilePath')]"
+          },
+          "pullPrincipalIds": {
+            "value": [
+              "[reference('cluster1').outputs.kubeletIdentityObjectId.value]",
+              "[reference('cluster2').outputs.kubeletIdentityObjectId.value]"
+            ]
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.10-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "0.15.31.15270",
+              "templateHash": "5872854529946825689"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "registryName": {
+              "type": "string"
+            },
+            "imageName": {
+              "type": "string"
+            },
+            "sourceRepo": {
+              "type": "string"
+            },
+            "dockerFilePath": {
+              "type": "string"
+            },
+            "pullPrincipalIds": {
+              "type": "array"
+            },
+            "imageTagSeed": {
+              "type": "string",
+              "defaultValue": "[utcNow()]"
+            }
+          },
+          "variables": {
+            "imageNameWithTag": "[format('{0}:v1-{1}', parameters('imageName'), uniqueString(parameters('imageTagSeed')))]"
+          },
+          "resources": {
+            "containerRegistry": {
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2021-06-01-preview",
+              "name": "[parameters('registryName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard"
+              },
+              "properties": {
+                "adminUserEnabled": false
+              }
+            },
+            "buildTask": {
+              "type": "Microsoft.ContainerRegistry/registries/taskRuns",
+              "apiVersion": "2019-06-01-preview",
+              "name": "[format('{0}/{1}', parameters('registryName'), uniqueString(parameters('imageName')))]",
+              "properties": {
+                "runRequest": {
+                  "type": "DockerBuildRequest",
+                  "dockerFilePath": "[parameters('dockerFilePath')]",
+                  "imageNames": [
+                    "[variables('imageNameWithTag')]"
+                  ],
+                  "isPushEnabled": true,
+                  "sourceLocation": "[parameters('sourceRepo')]",
+                  "platform": {
+                    "os": "Linux",
+                    "architecture": "amd64"
+                  },
+                  "agentConfiguration": {
+                    "cpu": 2
+                  }
+                }
+              },
+              "dependsOn": [
+                "containerRegistry"
+              ]
+            },
+            "containerPullRoleDefinition": {
+              "existing": true,
+              "type": "Microsoft.Authorization/roleDefinitions",
+              "apiVersion": "2018-01-01-preview",
+              "subscriptionId": "[subscription().subscriptionId]",
+              "name": "7f951dda-4ed3-4680-a7ca-43fe172d538d"
+            },
+            "containerPullRoleAssignment": {
+              "copy": {
+                "name": "containerPullRoleAssignment",
+                "count": "[length(parameters('pullPrincipalIds'))]"
+              },
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2020-10-01-preview",
+              "scope": "[format('Microsoft.ContainerRegistry/registries/{0}', parameters('registryName'))]",
+              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('registryName')), parameters('pullPrincipalIds')[copyIndex()], subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d'))]",
+              "properties": {
+                "principalId": "[parameters('pullPrincipalIds')[copyIndex()]]",
+                "principalType": "ServicePrincipal",
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]"
+              },
+              "dependsOn": [
+                "containerRegistry"
+              ]
+            }
+          },
+          "outputs": {
+            "image": {
+              "type": "string",
+              "value": "[format('{0}/{1}', reference('containerRegistry').loginServer, variables('imageNameWithTag'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "cluster1",
+        "cluster2"
+      ]
+    },
+    "kubeApplyCluster1": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-cl1-kube', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "aksCluserName": {
+            "value": "[reference('cluster1').outputs.clusterName.value]"
+          },
+          "containerImage": {
+            "value": "[reference('containerImage').outputs.image.value]"
+          },
+          "namespaceName": {
+            "value": "[variables('namespaceName')]"
+          },
+          "workloadName": {
+            "value": "[variables('workloadName')]"
+          },
+          "replicas": {
+            "value": "[variables('podReplicas')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.10-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "0.15.31.15270",
+              "templateHash": "15986082025013665474"
+            }
+          },
+          "parameters": {
+            "aksCluserName": {
+              "type": "string"
+            },
+            "containerImage": {
+              "type": "string"
+            },
+            "replicas": {
+              "type": "int"
+            },
+            "namespaceName": {
+              "type": "string"
+            },
+            "workloadName": {
+              "type": "string"
+            }
+          },
+          "resources": {
+            "aksClusterRef": {
+              "existing": true,
+              "type": "Microsoft.ContainerService/managedClusters",
+              "apiVersion": "2022-07-02-preview",
+              "name": "[parameters('aksCluserName')]"
+            },
+            "kubeApply": {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2020-10-01",
+              "name": "[format('{0}-deploy', deployment().name)]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "containerImage": {
+                    "value": "[parameters('containerImage')]"
+                  },
+                  "kubeConfig": {
+                    "value": "[listClusterAdminCredential(resourceId('Microsoft.ContainerService/managedClusters', parameters('aksCluserName')), '2022-07-02-preview').kubeconfigs[0].value]"
+                  },
+                  "replicas": {
+                    "value": "[parameters('replicas')]"
+                  },
+                  "namespaceName": {
+                    "value": "[parameters('namespaceName')]"
+                  },
+                  "workloadName": {
+                    "value": "[parameters('workloadName')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "languageVersion": "1.10-experimental",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.15.31.15270",
+                      "templateHash": "3959760702576468464"
+                    }
+                  },
+                  "parameters": {
+                    "kubeConfig": {
+                      "type": "securestring"
+                    },
+                    "containerImage": {
+                      "type": "string"
+                    },
+                    "replicas": {
+                      "type": "int"
+                    },
+                    "namespaceName": {
+                      "type": "string"
+                    },
+                    "workloadName": {
+                      "type": "string"
+                    }
+                  },
+                  "imports": {
+                    "kubernetes": {
+                      "provider": "Kubernetes",
+                      "version": "1.0.0",
+                      "config": {
+                        "namespace": "[parameters('namespaceName')]",
+                        "kubeConfig": "[parameters('kubeConfig')]"
+                      }
+                    }
+                  },
+                  "resources": {
+                    "namespace": {
+                      "import": "kubernetes",
+                      "type": "core/Namespace@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[parameters('namespaceName')]"
+                        }
+                      }
+                    },
+                    "zonetestDeployment": {
+                      "import": "kubernetes",
+                      "type": "apps/Deployment@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[parameters('workloadName')]"
+                        },
+                        "spec": {
+                          "replicas": "[parameters('replicas')]",
+                          "selector": {
+                            "matchLabels": {
+                              "app": "[parameters('workloadName')]"
+                            }
+                          },
+                          "template": {
+                            "metadata": {
+                              "labels": {
+                                "app": "[parameters('workloadName')]"
+                              }
+                            },
+                            "spec": {
+                              "nodeSelector": {
+                                "beta.kubernetes.io/os": "linux"
+                              },
+                              "containers": [
+                                {
+                                  "name": "[parameters('workloadName')]",
+                                  "image": "[parameters('containerImage')]",
+                                  "ports": [
+                                    {
+                                      "containerPort": 80
+                                    }
+                                  ],
+                                  "env": [
+                                    {
+                                      "name": "pod_name",
+                                      "valueFrom": {
+                                        "fieldRef": {
+                                          "fieldPath": "metadata.name"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "name": "k8s_hostname",
+                                      "valueFrom": {
+                                        "fieldRef": {
+                                          "fieldPath": "spec.nodeName"
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "namespace"
+                      ]
+                    },
+                    "zonetestService": {
+                      "import": "kubernetes",
+                      "type": "core/Service@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[parameters('workloadName')]"
+                        },
+                        "spec": {
+                          "type": "LoadBalancer",
+                          "ports": [
+                            {
+                              "port": 80
+                            }
+                          ],
+                          "selector": {
+                            "app": "[parameters('workloadName')]"
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "namespace"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "cluster1",
+        "containerImage"
+      ]
+    },
+    "kubeApplyCluster2": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-cl2-kube', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "aksCluserName": {
+            "value": "[reference('cluster2').outputs.clusterName.value]"
+          },
+          "containerImage": {
+            "value": "[reference('containerImage').outputs.image.value]"
+          },
+          "namespaceName": {
+            "value": "[variables('namespaceName')]"
+          },
+          "workloadName": {
+            "value": "[variables('workloadName')]"
+          },
+          "replicas": {
+            "value": "[variables('podReplicas')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.10-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "0.15.31.15270",
+              "templateHash": "15986082025013665474"
+            }
+          },
+          "parameters": {
+            "aksCluserName": {
+              "type": "string"
+            },
+            "containerImage": {
+              "type": "string"
+            },
+            "replicas": {
+              "type": "int"
+            },
+            "namespaceName": {
+              "type": "string"
+            },
+            "workloadName": {
+              "type": "string"
+            }
+          },
+          "resources": {
+            "aksClusterRef": {
+              "existing": true,
+              "type": "Microsoft.ContainerService/managedClusters",
+              "apiVersion": "2022-07-02-preview",
+              "name": "[parameters('aksCluserName')]"
+            },
+            "kubeApply": {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2020-10-01",
+              "name": "[format('{0}-deploy', deployment().name)]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "containerImage": {
+                    "value": "[parameters('containerImage')]"
+                  },
+                  "kubeConfig": {
+                    "value": "[listClusterAdminCredential(resourceId('Microsoft.ContainerService/managedClusters', parameters('aksCluserName')), '2022-07-02-preview').kubeconfigs[0].value]"
+                  },
+                  "replicas": {
+                    "value": "[parameters('replicas')]"
+                  },
+                  "namespaceName": {
+                    "value": "[parameters('namespaceName')]"
+                  },
+                  "workloadName": {
+                    "value": "[parameters('workloadName')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "languageVersion": "1.10-experimental",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.15.31.15270",
+                      "templateHash": "3959760702576468464"
+                    }
+                  },
+                  "parameters": {
+                    "kubeConfig": {
+                      "type": "securestring"
+                    },
+                    "containerImage": {
+                      "type": "string"
+                    },
+                    "replicas": {
+                      "type": "int"
+                    },
+                    "namespaceName": {
+                      "type": "string"
+                    },
+                    "workloadName": {
+                      "type": "string"
+                    }
+                  },
+                  "imports": {
+                    "kubernetes": {
+                      "provider": "Kubernetes",
+                      "version": "1.0.0",
+                      "config": {
+                        "namespace": "[parameters('namespaceName')]",
+                        "kubeConfig": "[parameters('kubeConfig')]"
+                      }
+                    }
+                  },
+                  "resources": {
+                    "namespace": {
+                      "import": "kubernetes",
+                      "type": "core/Namespace@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[parameters('namespaceName')]"
+                        }
+                      }
+                    },
+                    "zonetestDeployment": {
+                      "import": "kubernetes",
+                      "type": "apps/Deployment@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[parameters('workloadName')]"
+                        },
+                        "spec": {
+                          "replicas": "[parameters('replicas')]",
+                          "selector": {
+                            "matchLabels": {
+                              "app": "[parameters('workloadName')]"
+                            }
+                          },
+                          "template": {
+                            "metadata": {
+                              "labels": {
+                                "app": "[parameters('workloadName')]"
+                              }
+                            },
+                            "spec": {
+                              "nodeSelector": {
+                                "beta.kubernetes.io/os": "linux"
+                              },
+                              "containers": [
+                                {
+                                  "name": "[parameters('workloadName')]",
+                                  "image": "[parameters('containerImage')]",
+                                  "ports": [
+                                    {
+                                      "containerPort": 80
+                                    }
+                                  ],
+                                  "env": [
+                                    {
+                                      "name": "pod_name",
+                                      "valueFrom": {
+                                        "fieldRef": {
+                                          "fieldPath": "metadata.name"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "name": "k8s_hostname",
+                                      "valueFrom": {
+                                        "fieldRef": {
+                                          "fieldPath": "spec.nodeName"
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "namespace"
+                      ]
+                    },
+                    "zonetestService": {
+                      "import": "kubernetes",
+                      "type": "core/Service@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[parameters('workloadName')]"
+                        },
+                        "spec": {
+                          "type": "LoadBalancer",
+                          "ports": [
+                            {
+                              "port": 80
+                            }
+                          ],
+                          "selector": {
+                            "app": "[parameters('workloadName')]"
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "namespace"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "cluster2",
+        "containerImage"
+      ]
+    }
+  }
+}

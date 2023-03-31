@@ -7,7 +7,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.15.31.15270",
-      "templateHash": "11173119193415230033"
+      "templateHash": "11396852899174757440"
     }
   },
   "parameters": {
@@ -151,7 +151,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "4324813062546134446"
+              "templateHash": "14155583153787388154"
             }
           },
           "parameters": {
@@ -222,7 +222,9 @@
                   {
                     "name": "[parameters('nodeSubnetName')]",
                     "properties": {
-                      "addressPrefix": "[parameters('nodeSubnetPrefix')]"
+                      "addressPrefix": "[parameters('nodeSubnetPrefix')]",
+                      "privateEndpointNetworkPolicies": "Enabled",
+                      "privateLinkServiceNetworkPolicies": "Enabled"
                     }
                   }
                 ]
@@ -310,6 +312,10 @@
             "vnetId": {
               "type": "string",
               "value": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+            },
+            "nodeSubnetId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('nodeSubnetName'))]"
             },
             "clusterName": {
               "type": "string",
@@ -1043,7 +1049,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "9767449333519416329"
+              "templateHash": "6413021067953472828"
             }
           },
           "parameters": {
@@ -1097,6 +1103,9 @@
                   },
                   "clusterName": {
                     "value": "[parameters('aksCluserName')]"
+                  },
+                  "clusterId": {
+                    "value": "[resourceId('Microsoft.ContainerService/managedClusters', parameters('aksCluserName'))]"
                   }
                 },
                 "template": {
@@ -1108,7 +1117,7 @@
                     "_generator": {
                       "name": "bicep",
                       "version": "0.15.31.15270",
-                      "templateHash": "5944572426434625217"
+                      "templateHash": "16077041108005403967"
                     }
                   },
                   "parameters": {
@@ -1129,7 +1138,13 @@
                     },
                     "clusterName": {
                       "type": "string"
+                    },
+                    "clusterId": {
+                      "type": "string"
                     }
+                  },
+                  "variables": {
+                    "plsName": "[format('pls-{0}', guid(parameters('clusterId'), parameters('namespaceName'), parameters('workloadName')))]"
                   },
                   "imports": {
                     "kubernetes": {
@@ -1246,7 +1261,9 @@
                         "metadata": {
                           "name": "[format('{0}-internal', parameters('workloadName'))]",
                           "annotations": {
-                            "service.beta.kubernetes.io/azure-load-balancer-internal": "true"
+                            "service.beta.kubernetes.io/azure-load-balancer-internal": "true",
+                            "service.beta.kubernetes.io/azure-pls-create": "true",
+                            "service.beta.kubernetes.io/azure-pls-name": "[variables('plsName')]"
                           }
                         },
                         "spec": {
@@ -1288,9 +1305,29 @@
                         "namespace"
                       ]
                     }
+                  },
+                  "outputs": {
+                    "internalServiceName": {
+                      "type": "string",
+                      "value": "[reference('zonetestServiceInternal').metadata.name]"
+                    },
+                    "privateLinkServiceName": {
+                      "type": "string",
+                      "value": "[variables('plsName')]"
+                    }
                   }
                 }
               }
+            }
+          },
+          "outputs": {
+            "privateLinkServiceId": {
+              "type": "string",
+              "value": "[resourceId(subscription().subscriptionId, reference('aksClusterRef').nodeResourceGroup, 'Microsoft.Network/privateLinkServices', reference('kubeApply').outputs.privateLinkServiceName.value)]"
+            },
+            "nodeResourceGroup": {
+              "type": "string",
+              "value": "[reference('aksClusterRef').nodeResourceGroup]"
             }
           }
         }
@@ -1299,6 +1336,206 @@
         "cluster1",
         "containerImage",
         "containerPullPermission"
+      ]
+    },
+    "privateEndpoint": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-pe', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "subnetId": {
+            "value": "[reference('cluster1').outputs.nodeSubnetId.value]"
+          },
+          "endpointName": {
+            "value": "[format(variables('uniqueNameFormat'), 'cluster1-endpoint')]"
+          },
+          "endpointNicName": {
+            "value": "[format(variables('uniqueNameFormat'), 'cluster1-endpoint-nic')]"
+          },
+          "privateLinkServiceId": {
+            "value": "[reference('kubeApplyCluster1').outputs.privateLinkServiceId.value]"
+          },
+          "nodeResourceGroup": {
+            "value": "[reference('kubeApplyCluster1').outputs.nodeResourceGroup.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.10-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "0.15.31.15270",
+              "templateHash": "4343535983088741049"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "endpointName": {
+              "type": "string"
+            },
+            "endpointNicName": {
+              "type": "string"
+            },
+            "subnetId": {
+              "type": "string"
+            },
+            "nodeResourceGroup": {
+              "type": "string"
+            },
+            "privateLinkServiceId": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object"
+            }
+          },
+          "variables": {
+            "waitScriptName": "[format('waitscript-{0}', uniqueString(parameters('endpointName'), parameters('endpointNicName'), parameters('subnetId'), parameters('privateLinkServiceId')))]"
+          },
+          "resources": {
+            "waitIdentity": {
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2023-01-31",
+              "name": "[variables('waitScriptName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            },
+            "waitScript": {
+              "type": "Microsoft.Resources/deploymentScripts",
+              "apiVersion": "2020-10-01",
+              "name": "[variables('waitScriptName')]",
+              "location": "[parameters('location')]",
+              "kind": "AzureCLI",
+              "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                  "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('waitScriptName')))]": {}
+                }
+              },
+              "properties": {
+                "forceUpdateTag": "1",
+                "azCliVersion": "2.43.0",
+                "environmentVariables": [
+                  {
+                    "name": "RESOURCE_ID",
+                    "value": "[parameters('privateLinkServiceId')]"
+                  }
+                ],
+                "scriptContent": "az resource wait --exists --ids $RESOURCE_ID",
+                "timeout": "PT30M",
+                "cleanupPreference": "Always",
+                "retentionInterval": "P1D"
+              },
+              "tags": "[parameters('tags')]",
+              "dependsOn": [
+                "waitIdentity",
+                "waitRoleAssign"
+              ]
+            },
+            "privateEndpoint": {
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2022-09-01",
+              "name": "[parameters('endpointName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "subnet": {
+                  "id": "[parameters('subnetId')]"
+                },
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[parameters('endpointName')]",
+                    "properties": {
+                      "privateLinkServiceId": "[parameters('privateLinkServiceId')]"
+                    }
+                  }
+                ],
+                "customNetworkInterfaceName": "[parameters('endpointNicName')]"
+              },
+              "dependsOn": [
+                "waitScript"
+              ]
+            },
+            "waitRoleAssign": {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2020-10-01",
+              "name": "[format('{0}-waitrole', deployment().name)]",
+              "resourceGroup": "[parameters('nodeResourceGroup')]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "principalId": {
+                    "value": "[reference('waitIdentity').principalId]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "languageVersion": "1.10-experimental",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.15.31.15270",
+                      "templateHash": "1844275512960160991"
+                    }
+                  },
+                  "parameters": {
+                    "principalId": {
+                      "type": "string"
+                    }
+                  },
+                  "resources": {
+                    "readerRoleDefinition": {
+                      "existing": true,
+                      "type": "Microsoft.Authorization/roleDefinitions",
+                      "apiVersion": "2018-01-01-preview",
+                      "subscriptionId": "[subscription().subscriptionId]",
+                      "name": "acdd72a7-3385-48ef-bd42-f606fba81ae7"
+                    },
+                    "readerRoleAssignment": {
+                      "type": "Microsoft.Authorization/roleAssignments",
+                      "apiVersion": "2020-10-01-preview",
+                      "name": "[guid(resourceGroup().id, parameters('principalId'), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7'))]",
+                      "properties": {
+                        "principalId": "[parameters('principalId')]",
+                        "principalType": "ServicePrincipal",
+                        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')]"
+                      }
+                    }
+                  }
+                }
+              },
+              "dependsOn": [
+                "waitIdentity"
+              ]
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "cluster1",
+        "kubeApplyCluster1",
+        "vnetPeering"
       ]
     }
   }

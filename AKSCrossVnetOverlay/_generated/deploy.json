@@ -7,7 +7,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.15.31.15270",
-      "templateHash": "16250938928487490322"
+      "templateHash": "7130811596698906425"
     }
   },
   "parameters": {
@@ -619,12 +619,6 @@
           },
           "dockerFilePath": {
             "value": "[parameters('dockerFilePath')]"
-          },
-          "pullPrincipalIds": {
-            "value": [
-              "[reference('cluster1').outputs.kubeletIdentityObjectId.value]",
-              "[reference('cluster2').outputs.kubeletIdentityObjectId.value]"
-            ]
           }
         },
         "template": {
@@ -636,7 +630,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "5872854529946825689"
+              "templateHash": "8275257652943805071"
             }
           },
           "parameters": {
@@ -654,9 +648,6 @@
             },
             "dockerFilePath": {
               "type": "string"
-            },
-            "pullPrincipalIds": {
-              "type": "array"
             },
             "imageTagSeed": {
               "type": "string",
@@ -704,6 +695,67 @@
               "dependsOn": [
                 "containerRegistry"
               ]
+            }
+          },
+          "outputs": {
+            "image": {
+              "type": "string",
+              "value": "[format('{0}/{1}', reference('containerRegistry').loginServer, variables('imageNameWithTag'))]"
+            },
+            "registryName": {
+              "type": "string",
+              "value": "[parameters('registryName')]"
+            }
+          }
+        }
+      }
+    },
+    "containerPullPermission": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('{0}-acrpull', deployment().name)]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "registryName": {
+            "value": "[reference('containerImage').outputs.registryName.value]"
+          },
+          "pullPrincipalIds": {
+            "value": [
+              "[reference('cluster1').outputs.kubeletIdentityObjectId.value]",
+              "[reference('cluster2').outputs.kubeletIdentityObjectId.value]"
+            ]
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.10-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "0.15.31.15270",
+              "templateHash": "17698667558784957844"
+            }
+          },
+          "parameters": {
+            "registryName": {
+              "type": "string"
+            },
+            "pullPrincipalIds": {
+              "type": "array"
+            }
+          },
+          "resources": {
+            "containerRegistry": {
+              "existing": true,
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2021-06-01-preview",
+              "name": "[parameters('registryName')]"
             },
             "containerPullRoleDefinition": {
               "existing": true,
@@ -725,23 +777,15 @@
                 "principalId": "[parameters('pullPrincipalIds')[copyIndex()]]",
                 "principalType": "ServicePrincipal",
                 "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]"
-              },
-              "dependsOn": [
-                "containerRegistry"
-              ]
-            }
-          },
-          "outputs": {
-            "image": {
-              "type": "string",
-              "value": "[format('{0}/{1}', reference('containerRegistry').loginServer, variables('imageNameWithTag'))]"
+              }
             }
           }
         }
       },
       "dependsOn": [
         "cluster1",
-        "cluster2"
+        "cluster2",
+        "containerImage"
       ]
     },
     "kubeApplyCluster1": {
@@ -779,7 +823,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "14510601048360691500"
+              "templateHash": "14576006467931476451"
             }
           },
           "parameters": {
@@ -844,7 +888,7 @@
                     "_generator": {
                       "name": "bicep",
                       "version": "0.15.31.15270",
-                      "templateHash": "13554863364302816583"
+                      "templateHash": "3161436041817739734"
                     }
                   },
                   "parameters": {
@@ -952,12 +996,38 @@
                         "namespace"
                       ]
                     },
+                    "zonetestServiceExternal": {
+                      "import": "kubernetes",
+                      "type": "core/Service@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[format('{0}-external', parameters('workloadName'))]"
+                        },
+                        "spec": {
+                          "type": "LoadBalancer",
+                          "ports": [
+                            {
+                              "port": 80
+                            }
+                          ],
+                          "selector": {
+                            "app": "[parameters('workloadName')]"
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "namespace"
+                      ]
+                    },
                     "zonetestService": {
                       "import": "kubernetes",
                       "type": "core/Service@v1",
                       "properties": {
                         "metadata": {
-                          "name": "[parameters('workloadName')]"
+                          "name": "[format('{0}-internal', parameters('workloadName'))]",
+                          "annotations": {
+                            "service.beta.kubernetes.io/azure-load-balancer-internal": "true"
+                          }
                         },
                         "spec": {
                           "type": "LoadBalancer",
@@ -984,7 +1054,8 @@
       },
       "dependsOn": [
         "cluster1",
-        "containerImage"
+        "containerImage",
+        "containerPullPermission"
       ]
     },
     "kubeApplyCluster2": {
@@ -1022,7 +1093,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "14510601048360691500"
+              "templateHash": "14576006467931476451"
             }
           },
           "parameters": {
@@ -1087,7 +1158,7 @@
                     "_generator": {
                       "name": "bicep",
                       "version": "0.15.31.15270",
-                      "templateHash": "13554863364302816583"
+                      "templateHash": "3161436041817739734"
                     }
                   },
                   "parameters": {
@@ -1195,12 +1266,38 @@
                         "namespace"
                       ]
                     },
+                    "zonetestServiceExternal": {
+                      "import": "kubernetes",
+                      "type": "core/Service@v1",
+                      "properties": {
+                        "metadata": {
+                          "name": "[format('{0}-external', parameters('workloadName'))]"
+                        },
+                        "spec": {
+                          "type": "LoadBalancer",
+                          "ports": [
+                            {
+                              "port": 80
+                            }
+                          ],
+                          "selector": {
+                            "app": "[parameters('workloadName')]"
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "namespace"
+                      ]
+                    },
                     "zonetestService": {
                       "import": "kubernetes",
                       "type": "core/Service@v1",
                       "properties": {
                         "metadata": {
-                          "name": "[parameters('workloadName')]"
+                          "name": "[format('{0}-internal', parameters('workloadName'))]",
+                          "annotations": {
+                            "service.beta.kubernetes.io/azure-load-balancer-internal": "true"
+                          }
                         },
                         "spec": {
                           "type": "LoadBalancer",
@@ -1227,7 +1324,8 @@
       },
       "dependsOn": [
         "cluster2",
-        "containerImage"
+        "containerImage",
+        "containerPullPermission"
       ]
     }
   }

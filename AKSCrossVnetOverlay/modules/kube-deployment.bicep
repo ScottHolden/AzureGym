@@ -77,10 +77,31 @@ resource zonetestDeployment 'apps/Deployment@v1' = {
   }
 }
 
+resource zonetestServiceExternal 'core/Service@v1' = {
+  dependsOn: [ namespace ]
+  metadata: {
+    name: '${workloadName}-external'
+  }
+  spec: {
+    type: 'LoadBalancer'
+    ports: [
+      {
+        port: 80
+      }
+    ]
+    selector: {
+      app: workloadName
+    }
+  }
+}
+
 resource zonetestService 'core/Service@v1' = {
   dependsOn: [ namespace ]
   metadata: {
-    name: workloadName
+    name: '${workloadName}-internal'
+    annotations: {
+      'service.beta.kubernetes.io/azure-load-balancer-internal': 'true'
+    }
   }
   spec: {
     type: 'LoadBalancer'

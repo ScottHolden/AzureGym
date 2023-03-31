@@ -99,6 +99,13 @@ module containerImage 'modules/container-image.bicep' = {
     imageName: workloadName
     sourceRepo: sourceRepo
     dockerFilePath: dockerFilePath
+  }
+}
+
+module containerPullPermission 'modules/container-pull-permission.bicep' = {
+  name: '${deployment().name}-acrpull'
+  params: {
+    registryName: containerImage.outputs.registryName
     pullPrincipalIds: [
       cluster1.outputs.kubeletIdentityObjectId
       cluster2.outputs.kubeletIdentityObjectId
@@ -115,6 +122,7 @@ module kubeApplyCluster1 'modules/kube-apply.bicep' = {
     workloadName: workloadName
     replicas: podReplicas
   }
+  dependsOn: [ containerPullPermission ]
 }
 
 module kubeApplyCluster2 'modules/kube-apply.bicep' = {
@@ -126,4 +134,5 @@ module kubeApplyCluster2 'modules/kube-apply.bicep' = {
     workloadName: workloadName
     replicas: podReplicas
   }
+  dependsOn: [ containerPullPermission ]
 }

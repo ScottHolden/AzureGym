@@ -7,7 +7,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.15.31.15270",
-      "templateHash": "5237225183815646297"
+      "templateHash": "4934332978434254438"
     }
   },
   "parameters": {
@@ -150,7 +150,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "10593488571335277272"
+              "templateHash": "4324813062546134446"
             }
           },
           "parameters": {
@@ -291,7 +291,7 @@
               "scope": "[format('Microsoft.Network/virtualNetworks/{0}/subnets/{1}', parameters('vnetName'), parameters('nodeSubnetName'))]",
               "name": "[guid(resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('nodeSubnetName')), resourceId('Microsoft.ContainerService/managedClusters', parameters('clusterName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c'))]",
               "properties": {
-                "principalId": "[reference('cluster').identityProfile.kubeletidentity.objectId]",
+                "principalId": "[reference('cluster', '2022-11-02-preview', 'full').identity.principalId]",
                 "principalType": "ServicePrincipal",
                 "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]"
               },
@@ -378,7 +378,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.15.31.15270",
-              "templateHash": "10593488571335277272"
+              "templateHash": "4324813062546134446"
             }
           },
           "parameters": {
@@ -519,7 +519,7 @@
               "scope": "[format('Microsoft.Network/virtualNetworks/{0}/subnets/{1}', parameters('vnetName'), parameters('nodeSubnetName'))]",
               "name": "[guid(resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('nodeSubnetName')), resourceId('Microsoft.ContainerService/managedClusters', parameters('clusterName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c'))]",
               "properties": {
-                "principalId": "[reference('cluster').identityProfile.kubeletidentity.objectId]",
+                "principalId": "[reference('cluster', '2022-11-02-preview', 'full').identity.principalId]",
                 "principalType": "ServicePrincipal",
                 "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]"
               },

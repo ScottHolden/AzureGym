@@ -90,7 +90,7 @@ resource containerPullRoleAssignment 'Microsoft.Authorization/roleAssignments@20
   name: guid(vnet::nodeSubnet.id, cluster.id, contributorRoleDefinition.id)
   scope: vnet::nodeSubnet
   properties: {
-    principalId: cluster.properties.identityProfile.kubeletidentity.objectId
+    principalId: cluster.identity.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: contributorRoleDefinition.id
   }

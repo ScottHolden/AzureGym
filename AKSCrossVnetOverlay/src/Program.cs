@@ -76,12 +76,13 @@ app.MapPost("/call", async (CallRequest call) =>
         return Results.Text("Error: " + e.Message, "text/plain", Encoding.UTF8);
     }
 });
-app.MapGet("/ping", () => $"Hello from {podName} on {hostName} [{cluster}]");
-app.MapGet("/json", () => new
+app.MapGet("/ping", (HttpContext context) => $"Hello '{context.Connection?.RemoteIpAddress?.ToString() ?? "?"}' from {podName} on {hostName} [{cluster}]");
+app.MapGet("/json", (HttpContext context) => new
 {
     podName = podName,
     hostName = hostName,
-    cluster = cluster
+    cluster = cluster,
+    fromIP = context.Connection?.RemoteIpAddress?.ToString() ?? "?"
 });
 
 app.Run();

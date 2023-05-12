@@ -1,0 +1,262 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.17.1.54307",
+      "templateHash": "2770240134752167794"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "prefix": {
+      "type": "string",
+      "defaultValue": "AzVAmPI"
+    },
+    "vampiGitUrl": {
+      "type": "string",
+      "defaultValue": "https://github.com/erev0s/VAmPI.git"
+    },
+    "vampiOpenApiSpecUrl": {
+      "type": "string",
+      "defaultValue": "https://raw.githubusercontent.com/erev0s/VAmPI/master/openapi_specs/openapi3.yml"
+    },
+    "vampiImageName": {
+      "type": "string",
+      "defaultValue": "vampi"
+    },
+    "vampiImageTag": {
+      "type": "string",
+      "defaultValue": "[format('v1-{0}', uniqueString(utcNow()))]"
+    },
+    "apimEmail": {
+      "type": "string",
+      "defaultValue": "noreply@microsoft.com"
+    }
+  },
+  "variables": {
+    "uniqueNameFormat": "[format('{0}-{{0}}-{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix')))]",
+    "uniqueShortNameFormat": "[toLower(format('{0}{{0}}{1}', parameters('prefix'), uniqueString(resourceGroup().id, parameters('prefix'))))]",
+    "vampiImageNameWithTag": "[format('{0}:{1}', parameters('vampiImageName'), parameters('vampiImageTag'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ApiManagement/service/loggers",
+      "apiVersion": "2022-04-01-preview",
+      "name": "[format('{0}/{1}', format(variables('uniqueNameFormat'), 'APIM'), format(variables('uniqueNameFormat'), 'AppIns'))]",
+      "properties": {
+        "loggerType": "applicationInsights",
+        "resourceId": "[resourceId('Microsoft.Insights/components', format(variables('uniqueNameFormat'), 'AppIns'))]",
+        "credentials": {
+          "instrumentationKey": "[reference(resourceId('Microsoft.Insights/components', format(variables('uniqueNameFormat'), 'AppIns')), '2020-02-02').InstrumentationKey]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', format(variables('uniqueNameFormat'), 'APIM'))]",
+        "[resourceId('Microsoft.Insights/components', format(variables('uniqueNameFormat'), 'AppIns'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/diagnostics",
+      "apiVersion": "2022-04-01-preview",
+      "name": "[format('{0}/{1}', format(variables('uniqueNameFormat'), 'APIM'), 'applicationinsights')]",
+      "properties": {
+        "alwaysLog": "allErrors",
+        "loggerId": "[resourceId('Microsoft.ApiManagement/service/loggers', format(variables('uniqueNameFormat'), 'APIM'), format(variables('uniqueNameFormat'), 'AppIns'))]",
+        "sampling": {
+          "percentage": 100,
+          "samplingType": "fixed"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', format(variables('uniqueNameFormat'), 'APIM'))]",
+        "[resourceId('Microsoft.ApiManagement/service/loggers', format(variables('uniqueNameFormat'), 'APIM'), format(variables('uniqueNameFormat'), 'AppIns'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2022-08-01",
+      "name": "[format('{0}/{1}', format(variables('uniqueNameFormat'), 'APIM'), 'vampi')]",
+      "properties": {
+        "displayName": "VAmPI",
+        "path": "vampi",
+        "protocols": [
+          "https"
+        ],
+        "format": "openapi-link",
+        "value": "[parameters('vampiOpenApiSpecUrl')]",
+        "serviceUrl": "[format('https://{0}/', reference(resourceId('Microsoft.App/containerApps', 'vampi'), '2022-11-01-preview').configuration.ingress.fqdn)]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', format(variables('uniqueNameFormat'), 'APIM'))]",
+        "[resourceId('Microsoft.App/containerApps', 'vampi')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2021-06-01-preview",
+      "name": "[format(variables('uniqueShortNameFormat'), 'acr')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "adminUserEnabled": false
+      }
+    },
+    {
+      "type": "Microsoft.ContainerRegistry/registries/taskRuns",
+      "apiVersion": "2019-06-01-preview",
+      "name": "[format('{0}/{1}', format(variables('uniqueShortNameFormat'), 'acr'), uniqueString(parameters('vampiImageName')))]",
+      "properties": {
+        "forceUpdateTag": "[parameters('vampiImageTag')]",
+        "runRequest": {
+          "type": "DockerBuildRequest",
+          "dockerFilePath": "Dockerfile",
+          "imageNames": [
+            "[variables('vampiImageNameWithTag')]"
+          ],
+          "isPushEnabled": true,
+          "sourceLocation": "[parameters('vampiGitUrl')]",
+          "platform": {
+            "os": "Linux",
+            "architecture": "amd64"
+          },
+          "agentConfiguration": {
+            "cpu": 2
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', format(variables('uniqueShortNameFormat'), 'acr'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[format(variables('uniqueNameFormat'), 'Logs')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[format(variables('uniqueNameFormat'), 'AppIns')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'Logs'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'Logs'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2021-09-30-preview",
+      "name": "[format(variables('uniqueNameFormat'), 'ACRPull')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2020-10-01-preview",
+      "scope": "[format('Microsoft.ContainerRegistry/registries/{0}', format(variables('uniqueShortNameFormat'), 'acr'))]",
+      "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', format(variables('uniqueShortNameFormat'), 'acr')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'ACRPull')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'ACRPull')), '2021-09-30-preview').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'ACRPull'))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', format(variables('uniqueShortNameFormat'), 'acr'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2022-11-01-preview",
+      "name": "[format(variables('uniqueNameFormat'), 'ACAEnv')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'Logs')), '2022-10-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'Logs')), '2022-10-01').primarySharedKey]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format(variables('uniqueNameFormat'), 'Logs'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2022-11-01-preview",
+      "name": "vampi",
+      "location": "[parameters('location')]",
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format(variables('uniqueNameFormat'), 'ACAEnv'))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 5000
+          },
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', format(variables('uniqueShortNameFormat'), 'acr')), '2021-06-01-preview').loginServer]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'ACRPull'))]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "image": "[format('{0}/{1}', reference(resourceId('Microsoft.ContainerRegistry/registries', format(variables('uniqueShortNameFormat'), 'acr')), '2021-06-01-preview').loginServer, variables('vampiImageNameWithTag'))]",
+              "name": "vampi",
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1.0Gi"
+              }
+            }
+          ],
+          "scale": {
+            "minReplicas": 1,
+            "maxReplicas": 1
+          }
+        }
+      },
+      "identity": {
+        "type": "SystemAssigned,UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'ACRPull')))]": {}
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries/taskRuns', format(variables('uniqueShortNameFormat'), 'acr'), uniqueString(parameters('vampiImageName')))]",
+        "[resourceId('Microsoft.App/managedEnvironments', format(variables('uniqueNameFormat'), 'ACAEnv'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'ACRPull'))]",
+        "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', format(variables('uniqueShortNameFormat'), 'acr')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', format(variables('uniqueShortNameFormat'), 'acr')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format(variables('uniqueNameFormat'), 'ACRPull')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', format(variables('uniqueShortNameFormat'), 'acr'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service",
+      "apiVersion": "2021-08-01",
+      "name": "[format(variables('uniqueNameFormat'), 'APIM')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "capacity": 1,
+        "name": "Developer"
+      },
+      "properties": {
+        "publisherEmail": "[parameters('apimEmail')]",
+        "publisherName": "[parameters('prefix')]"
+      }
+    }
+  ]
+}

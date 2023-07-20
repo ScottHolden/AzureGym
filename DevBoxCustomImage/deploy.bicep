@@ -19,6 +19,9 @@ param tags object = {
   'Demo-Repo': 'https://github.com/ScottHolden/AzureGym/DevBoxCustomImage'
 }
 
+@description('A unique string generated for each deployment, to make sure the script is always run.')
+param forceUpdateTag string = newGuid()
+
 var uniqueName = '${toLower(prefix)}${uniqueString(prefix, resourceGroup().id)}'
 
 // Todo: make params
@@ -105,6 +108,7 @@ resource imageTemplate 'Microsoft.VirtualMachineImages/imageTemplates@2022-02-14
           'Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString(\'https://community.chocolatey.org/install.ps1\'))'
           'choco install -y vscode'
         ]
+        runElevated: true
       }
     ]
     distribute: [
@@ -127,4 +131,28 @@ resource imageTemplate 'Microsoft.VirtualMachineImages/imageTemplates@2022-02-14
     }
   }
   tags: tags
+}
+
+resource imageTemplateBuild 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
+  name: '${uniqueName}build'
+  location: location
+  kind: 'AzurePowerShell'
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${aibIdentity.id}': {}
+    }
+  }
+  dependsOn: [
+    imageTemplate
+    roleAssignment
+  ]
+  properties: {
+    forceUpdateTag: forceUpdateTag
+    azPowerShellVersion: '6.2'
+    scriptContent: 'Invoke-AzResourceAction -ResourceName "${uniqueName}" -ResourceGroupName "${resourceGroup().name}" -ResourceType "Microsoft.VirtualMachineImages/imageTemplates" -ApiVersion "2020-02-14" -Action Run -Force'
+    timeout: 'PT1H'
+    cleanupPreference: 'OnSuccess'
+    retentionInterval: 'P1D'
+  }
 }
